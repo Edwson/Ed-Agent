@@ -1,0 +1,56 @@
+{
+  "name": "ed-agent",
+  "version": "0.2.0",
+  "description": "Ed Agent — a mission-swappable one-person development army. One requirement drives nine human-gated lifecycle stages with a squad that swaps by domain (code · marketing · contract · regulated-finance), a learning memory that remembers your preferences, real artifacts at every stage, and a quantified Ed_agents_Claude.md ledger. Drop it into any bot via MCP or the AGENTS.md brief. Core is zero-dependency.",
+  "type": "module",
+  "bin": {
+    "ed-agent": "bin/ed-agent.mjs",
+    "ed-agent-mcp": "mcp/server.mjs"
+  },
+  "main": "src/orchestrator.mjs",
+  "exports": {
+    ".": "./src/orchestrator.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "mcp",
+    "knowledge",
+    "img/ed_agent.png",
+    "AGENTS.md",
+    "Ed_agents_Claude.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node bin/ed-agent.mjs",
+    "example": "node bin/ed-agent.mjs \"Build a KYC onboarding step for an Australian retail broker — Enhanced Due Diligence with source of funds\"",
+    "test": "node test/ed-agent.test.mjs",
+    "test:mcp": "node mcp/test-mcp.mjs",
+    "serve": "node mcp/server.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.25.76"
+  },
+  "keywords": [
+    "ai-agent",
+    "multi-agent",
+    "orchestration",
+    "lifecycle",
+    "mcp",
+    "design-ops",
+    "human-in-the-loop",
+    "eds-mcp",
+    "zero-dependency"
+  ],
+  "author": {
+    "name": "Ed Chen",
+    "url": "https://www.edwson.com"
+  },
+  "homepage": "https://github.com/Edwson/Ed-Agent",
+  "license": "MIT"
+}

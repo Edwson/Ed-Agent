@@ -1,0 +1,124 @@
+// orchestrator.mjs — the Ed Agent. Drives one requirement through nine
+// human-gated stages with a mission-swapped squad, a learning memory, and a
+// quantified Ed_agents_Claude.md ledger. The build half delegates to the active
+// mission (finance → eds-mcp; code/marketing/contract → skill engines).
+import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { c, estTokens, fmt } from './util.mjs';
+import { CONDUCTOR, stageOwnerName } from './agents.mjs';
+import { intake } from './intake.mjs';
+import { analyze } from './analyze.mjs';
+import { recall as recallMemory, checkpoint, commit } from './ledger.mjs';
+import * as prefs from './prefs.mjs';
+import { gate, allCleared, gateLine } from './gates.mjs';
+import { loadEngine } from './edsBridge.mjs';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const repoRoot = join(here, '..');
+
+export async function run(requirement, opts = {}) {
+  const quiet = !!opts.quiet;
+  const log = (s = '') => { if (!quiet) console.log(s); };
+  const requirementText = String(requirement || '').trim() ||
+    'Build a KYC onboarding step for an Australian retail broker — Enhanced Due Diligence with source of funds and the legal basis shown inline.';
+  const memoryPath = opts.memoryPath || join(repoRoot, 'Ed_agents_Claude.md');
+
+  // ── learning layer: record any new preferences, then recall + apply ──
+  if (opts.record && opts.record.length) prefs.record(memoryPath, opts.record);
+  const pref = prefs.recall(memoryPath);
+  const { opts: o, applied } = prefs.apply(pref, opts);
+
+  const intk = intake(requirementText, o);
+  const mission = intk.mission;
+  const outDir = o.outDir || join(repoRoot, 'out', intk.slug);
+  rmSync(outDir, { recursive: true, force: true });
+  mkdirSync(outDir, { recursive: true });
+  const wa = (name, content) => { const p = join(outDir, name); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, content); return name; };
+  const mkdir = (name) => { const p = join(outDir, name); mkdirSync(p, { recursive: true }); return p; };
+
+  const meter = [];
+  const tick = (stage, ownerName, input, artifactText, artifact) => meter.push({ stage, agent: ownerName, inTok: estTokens(input), outTok: estTokens(artifactText), artifact });
+
+  log(c.gold('━━━ Ed Agent · ' + mission.name + ' squad · nine human-gated stages ━━━'));
+  log('Requirement:  ' + c.bold('"' + requirementText + '"'));
+  if (applied.length) log(c.mag('Preferences:  applied ' + applied.join(', ')));
+
+  // 1 INTAKE
+  const a1 = `# 01 · Intake\n\n- **Requirement:** ${requirementText}\n- **Mission:** ${mission.name} (\`${mission.id}\`)\n- **Squad:** ${mission.squad.map((s) => s.name).join(' · ')}\n- **Domain:** ${intk.domain}${intk.jurisdiction ? `\n- **Jurisdiction:** ${intk.jurisdictionName} (\`${intk.jurisdiction}\`)` : ''}\n`;
+  tick('intake', CONDUCTOR.name, requirementText, a1, wa('01-intake.md', a1));
+  log(`\n[1/9] ${c.cyan('INTAKE')}    ${c.dim(CONDUCTOR.name)}  → ${mission.name} · ${intk.domain}`);
+
+  // 2 CONTEXT (recall memory + preferences)
+  const mem = recallMemory(memoryPath);
+  const a2 = `# 02 · Context recall\n\n- Prior runs in memory: **${mem.priorRuns}**\n- Preferences recalled: **${pref.count}**${applied.length ? ' (applied: ' + applied.join(', ') + ')' : ''}\n` +
+    (pref.likes.length ? `- Likes: ${pref.likes.join('; ')}\n` : '') + (pref.dislikes.length ? `- Dislikes: ${pref.dislikes.join('; ')}\n` : '') +
+    (pref.concepts.length ? `- Concepts: ${pref.concepts.join('; ')}\n` : '') + `\n## Context carried forward\n\n${mem.contextFacts || '_(seeded)_'}\n`;
+  tick('context', CONDUCTOR.name, mem.contextFacts + JSON.stringify(pref), a2, wa('02-context.md', a2));
+  log(`[2/9] ${c.cyan('CONTEXT')}   ${c.dim(CONDUCTOR.name)}  → ${mem.priorRuns} prior run(s) · ${pref.count} preference(s)`);
+
+  // 3 ANALYZE
+  const concerns = mission.concerns(requirementText);
+  const ana = analyze(intk, concerns);
+  const a3 = `# 03 · Analysis\n\n## Sub-requirements\n- ${ana.subRequirements.join('\n- ') || '(single)'}\n\n## Concerns to verify (${mission.name})\n- ${ana.concerns.join('\n- ')}\n\n## Constraints\n- ${ana.constraints.join('\n- ')}\n\n## Assumptions (honest)\n- ${ana.assumptions.join('\n- ')}\n`;
+  tick('analyze', stageOwnerName(mission, 'plan'), requirementText, a3, wa('03-analysis.md', a3));
+  log(`[3/9] ${c.cyan('ANALYZE')}   ${c.dim(stageOwnerName(mission, 'plan'))}  → ${ana.subRequirements.length} sub-reqs · ${ana.concerns.length} concerns`);
+
+  const brief = { ...intk, subRequirements: ana.subRequirements, concerns: ana.concerns, constraints: ana.constraints, assumptions: ana.assumptions, prefs: pref };
+
+  // engine (finance only)
+  const engine = mission.build === 'eds-mcp' ? await loadEngine(o) : { wired: false };
+  const ctx = { wa, mkdir, buildDir: join(outDir, '07-build'), engine, opts: o };
+
+  // 4 RESEARCH
+  const r = mission.research(brief, ctx);
+  tick('research', stageOwnerName(mission, 'research'), JSON.stringify(ana.concerns), r.text, r.out);
+  log(`[4/9] ${c.cyan('RESEARCH')}  ${c.dim(stageOwnerName(mission, 'research'))}  → ${r.summary}`);
+
+  // 5 LEDGER (grow memory + quantify so far)
+  checkpoint(memoryPath, { requirement: requirementText, domain: intk.domain + ' · ' + mission.name, jurisdictionName: intk.jurisdictionName, triggers: ana.concerns, coveragePct: r.coverage, findings: r.findings, conflicts: r.conflicts });
+  const soFarIn = meter.reduce((a, s) => a + s.inTok, 0), soFarOut = meter.reduce((a, s) => a + s.outTok, 0);
+  const a5 = `# 05 · Ledger checkpoint\n\nAnalysis + research written into \`Ed_agents_Claude.md\`; I/O ledger updated.\n\n- Estimated input so far: **${fmt(soFarIn)}** tokens\n- Estimated output so far: **${fmt(soFarOut)}** tokens\n\n_Estimates (~4 chars/token) — DesignOps cost-governance framing, not billed figures._\n`;
+  tick('ledger', CONDUCTOR.name, String(soFarIn), a5, wa('05-ledger-checkpoint.md', a5));
+  log(`[5/9] ${c.cyan('LEDGER')}    ${c.dim(CONDUCTOR.name)}  → memory updated · ${fmt(soFarIn)} in / ${fmt(soFarOut)} out (est)`);
+  if (mission.build === 'eds-mcp') log(c.dim('       engine: ' + (engine.wired ? 'eds-mcp wired (' + engine.stats.components + ' components)' : 'eds-mcp not found — contract-only build')));
+
+  // 6 PLAN / DESIGN  → APPROVE gate
+  const p = mission.plan(brief, ctx);
+  tick('plan', stageOwnerName(mission, 'plan'), requirementText, p.text, p.out);
+  const approveGate = gate('Plan / design approval', stageOwnerName(mission, 'plan') + ' → human', o.approve);
+  log(`[6/9] ${c.cyan('PLAN')}      ${c.dim(stageOwnerName(mission, 'plan'))}  → ${p.summary}  ${approveGate.status === 'approved' ? c.green(gateLine(approveGate)) : c.gold(gateLine(approveGate))}`);
+
+  // 7 PRODUCE / DEVELOP
+  const pr = mission.produce(brief, ctx);
+  tick('develop', stageOwnerName(mission, 'produce'), brief.subRequirements.join(','), pr.text, pr.out);
+  log(`[7/9] ${c.cyan('PRODUCE')}   ${c.dim(stageOwnerName(mission, 'produce'))}  → ${pr.summary}`);
+
+  // 8 REVIEW / QA
+  const rv = mission.review(brief, ctx);
+  tick('qa', stageOwnerName(mission, 'review'), brief.requirement, rv.text, rv.out);
+  log(`[8/9] ${c.cyan('REVIEW')}    ${c.dim(stageOwnerName(mission, 'review'))}  → ${rv.summary}`);
+
+  // 9 CERTIFY → SIGN-OFF gate
+  const cf = mission.certify(brief, ctx);
+  const signoffGate = gate('Certification sign-off', stageOwnerName(mission, 'certify') + ' → human', o.signoff);
+  const gates = [approveGate, signoffGate];
+  const shippable = allCleared(gates);
+  const a10 = `# 10 · Certification\n\n- Mission: **${mission.name}**\n- Conformance / checklist: ${cf.summary}\n- Review issues: ${rv.issues || 0}\n- Research coverage: ${r.coverage}%\n\n## Gates\n${gates.map((g) => '- ' + gateLine(g)).join('\n')}\n\n## Verdict\n**${shippable ? 'SHIPPABLE — all human gates cleared.' : 'NOT YET SHIPPABLE — human gate(s) pending. The harness does not bypass a gate.'}**\n\n_What the ${mission.name} squad did: intake, analysis, sourced research, plan, produce, review. What stays human: judgment and the two gates above._\n`;
+  tick('certify', stageOwnerName(mission, 'certify'), String(cf.count), a10, wa('10-certification.md', a10));
+  log(`[9/9] ${c.cyan('CERTIFY')}   ${c.dim(stageOwnerName(mission, 'certify'))}  → ${cf.summary}  ${shippable ? c.green(gateLine(signoffGate)) : c.gold(gateLine(signoffGate))}`);
+
+  const totals = commit(memoryPath, { slug: intk.slug, requirement: requirementText, mission: mission.name, domain: intk.domain, jurisdictionName: intk.jurisdictionName, coveragePct: r.coverage, conflicts: r.conflicts, gates, shippable, meter });
+
+  log('');
+  log(c.gold('━━━ done ━━━'));
+  log(`Squad:      ${mission.squad.map((s) => s.name).join(' · ')}`);
+  log(`Artifacts:  ${c.bold(outDir)}`);
+  log(`Memory:     Ed_agents_Claude.md  (run #${mem.priorRuns + 1})`);
+  log(`I/O (est):  ${c.bold(fmt(totals.totIn))} in / ${c.bold(fmt(totals.totOut))} out`);
+  log(`Verdict:    ${shippable ? c.green('SHIPPABLE') : c.gold('gates pending — not bypassed')}`);
+
+  return { slug: intk.slug, outDir, mission: mission.id, missionName: mission.name, squad: mission.squad.map((s) => s.name), domain: intk.domain, jurisdiction: intk.jurisdiction, jurisdictionName: intk.jurisdictionName, concerns: ana.concerns, coveragePct: r.coverage, conflicts: r.conflicts, findings: r.findings, gates, shippable, meter, totals, wired: !!engine.wired, priorRuns: mem.priorRuns, prefsApplied: applied, prefsCount: pref.count };
+}
+
+export { prefs };
