@@ -48,11 +48,11 @@ The mission is auto-detected from the requirement (override with `--mission`):
 | **Marketing** | Creative Director · Conversion Analyst · Consumer Psychologist · SEO | creative brief · conversion model · SEO plan · copy outline |
 | **Contract** | Senior Lawyer · Risk-Control Officer · Negotiator · Semantic-Logic reviewer | clause map · risk register · negotiation positions · ambiguity review |
 | **Finance** *(default)* | Planning · Regulation · Data · Development · QA · Risk & Governance | eds-mcp compliant build — scaffolded HTML/CSS/JS + conformance tests |
-| **Optimize** *(總導師)* | Executor A · Reviewer B · Copy C · Data/Logic D · Market/SEO E | blind-score diagnostic · adversarial debate · de-AI'd draft · three-part output |
+| **Optimize** *(司令官)* | Executor A · Reviewer B · Copy C · Data/Logic D · Market/SEO E | blind-score diagnostic · adversarial debate · de-AI'd draft · three-part output |
 
 Browse committed runs in **[`examples/`](./examples/)** — one per mission.
 
-## Review & optimize anything — the 總導師 squad
+## Review & optimize anything — the 司令官 squad
 
 The optimize mission takes **existing content** (a deck, a case study, a landing page, a clause)
 and runs the review SOP, so Ed Agent is a *thinking* unit, not only a *build* unit:
@@ -60,7 +60,7 @@ and runs the review SOP, so Ed Agent is a *thinking* unit, not only a *build* un
 1. **Diagnostic** — the squad blind-scores the content across five dimensions and names the **three most fatal flaws**.
 2. **Adversarial debate** — Reviewer B (a hard buyer) and Data/Logic D challenge it: *how does this create a real benefit, with a number?*
 3. **Humanize** — Copy C strips the AI-tone filler (a deterministic de-AI pass) and lays out the structure to finish.
-4. **Optimized version** — assembled in the exact three-part format: **【專家診斷回饋】 / 【優化後的最終版本】 / 【商業價值評估】**.
+4. **Optimized version** — assembled in the exact three-part format: **【専門家による診断フィードバック】 / 【最適化された最終バージョン】 / 【企業評価】**.
 
 ```bash
 node bin/ed-agent.mjs --mission optimize "In conclusion, our world-class platform seamlessly leverages cutting-edge synergy to improve value."
@@ -76,7 +76,7 @@ the jurisdiction, and the token-contrast WCAG pass rate of the system it would s
 
 Three house rules run in **every** review, not just optimize (the same `skills/quality.mjs`):
 
-- **Ban AI-tone filler** — an EN + 中文 scanner flags `in conclusion`, `leverage`, `seamless`, `總之`, `賦能`, … so the voice stays human.
+- **Ban AI-tone filler** — an EN + 日文 scanner flags `in conclusion`, `leverage`, `seamless`, `結論は`, `力を与える`, … so the voice stays human.
 - **Quantify or flag** — any sentence that asserts a benefit with no number is surfaced for a measured figure (ROI / cost / conversion / time saved).
 - **No blind praise** — a blind score (five dimensions) yields a **PASS / REWORK** verdict; mediocre work is told it *"would not pass a top-tier interview/review yet,"* with the reasons.
 
@@ -150,7 +150,7 @@ and applies the preferred mission / jurisdiction automatically.
 ```
 
 Tools (9): `ed_agent_run` · `ed_agent_deliberate` (audit any artifact/diff — "should I trust
-this?") · `ed_agent_trust_scan` (fast trust + substance) · `ed_agent_optimize` (the 總導師
+this?") · `ed_agent_trust_scan` (fast trust + substance) · `ed_agent_optimize` (the 司令官
 review) · `ed_agent_quality_scan` · `ed_agent_missions` · `ed_agent_skills` · `ed_agent_remember`
 · `ed_agent_recall`. Enable with `npm install @modelcontextprotocol/sdk zod` (optional — the CLI
 and library are zero-dependency).
