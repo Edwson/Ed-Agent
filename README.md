@@ -19,9 +19,11 @@ deliberation checkpoints** and surfaces the questions only a human can answer:
 - **Does the local optimum serve the global goal?** It flags the *technically-right, business-wrong* decision that digs a global pit.
 - **Is it substance, or over-defensive ceremony?** The "looks-rigorous, all-filler" detector.
 
-Plus a **memory that learns your preferences**, **quality disciplines** (ban AI-tone filler ·
-quantify-or-flag · no blind praise), real artifacts at every stage, and a quantified ledger.
-Drop it into any bot via **MCP** or the **`AGENTS.md`** brief. Zero-dependency core (Node 18+).
+Plus a **mission-aware red team** that attacks every build for what its domain cares about,
+**claim-level grounding** (Grounded / Ungrounded / Contradicted), a **memory that learns your
+preferences**, **quality disciplines** (ban AI-tone filler · quantify-or-flag · no blind praise),
+real artifacts at every stage, and a quantified ledger. Drop it into any bot via **MCP** or the
+**`AGENTS.md`** brief. Zero-dependency core (Node 18+).
 
 > _Click the mascot above to watch the intro._
 
@@ -48,11 +50,11 @@ The mission is auto-detected from the requirement (override with `--mission`):
 | **Marketing** | Creative Director · Conversion Analyst · Consumer Psychologist · SEO | creative brief · conversion model · SEO plan · copy outline |
 | **Contract** | Senior Lawyer · Risk-Control Officer · Negotiator · Semantic-Logic reviewer | clause map · risk register · negotiation positions · ambiguity review |
 | **Finance** *(default)* | Planning · Regulation · Data · Development · QA · Risk & Governance | eds-mcp compliant build — scaffolded HTML/CSS/JS + conformance tests |
-| **Optimize** *(司令官)* | Executor A · Reviewer B · Copy C · Data/Logic D · Market/SEO E | blind-score diagnostic · adversarial debate · de-AI'd draft · three-part output |
+| **Optimize** *(總導師)* | Executor A · Reviewer B · Copy C · Data/Logic D · Market/SEO E | blind-score diagnostic · adversarial debate · de-AI'd draft · three-part output |
 
 Browse committed runs in **[`examples/`](./examples/)** — one per mission.
 
-## Review & optimize anything — the 司令官 squad
+## Review & optimize anything — the 總導師 squad
 
 The optimize mission takes **existing content** (a deck, a case study, a landing page, a clause)
 and runs the review SOP, so Ed Agent is a *thinking* unit, not only a *build* unit:
@@ -60,7 +62,7 @@ and runs the review SOP, so Ed Agent is a *thinking* unit, not only a *build* un
 1. **Diagnostic** — the squad blind-scores the content across five dimensions and names the **three most fatal flaws**.
 2. **Adversarial debate** — Reviewer B (a hard buyer) and Data/Logic D challenge it: *how does this create a real benefit, with a number?*
 3. **Humanize** — Copy C strips the AI-tone filler (a deterministic de-AI pass) and lays out the structure to finish.
-4. **Optimized version** — assembled in the exact three-part format: **【専門家による診断フィードバック】 / 【最適化された最終バージョン】 / 【企業評価】**.
+4. **Optimized version** — assembled in the exact three-part format: **【專家診斷回饋】 / 【優化後的最終版本】 / 【商業價值評估】**.
 
 ```bash
 node bin/ed-agent.mjs --mission optimize "In conclusion, our world-class platform seamlessly leverages cutting-edge synergy to improve value."
@@ -76,7 +78,7 @@ the jurisdiction, and the token-contrast WCAG pass rate of the system it would s
 
 Three house rules run in **every** review, not just optimize (the same `skills/quality.mjs`):
 
-- **Ban AI-tone filler** — an EN + 日文 scanner flags `in conclusion`, `leverage`, `seamless`, `結論は`, `力を与える`, … so the voice stays human.
+- **Ban AI-tone filler** — an EN + 中文 scanner flags `in conclusion`, `leverage`, `seamless`, `總之`, `賦能`, … so the voice stays human.
 - **Quantify or flag** — any sentence that asserts a benefit with no number is surfaced for a measured figure (ROI / cost / conversion / time saved).
 - **No blind praise** — a blind score (five dimensions) yields a **PASS / REWORK** verdict; mediocre work is told it *"would not pass a top-tier interview/review yet,"* with the reasons.
 
@@ -115,6 +117,41 @@ The four assessors live in **`skills/trust.mjs`** (intent capture · trust score
 coherence · substance scan) — all deterministic, all framed as *questions for you*, none of
 them making the call.
 
+## The red team + claim grounding *(v0.5)*
+
+Every build now also runs two **mission-aware, deterministic** passes — **~0 token** (no LLM
+calls), because they're pure functions, not prompts. "Caring about more" costs almost nothing.
+
+- **Red team** — an adversarial pass whose only job is to **attack** the produced artifact for
+  what *this* mission cares about. The universal checks (unquantified claims · AI-tone filler ·
+  over-defensive ceremony · anything that does what a **non-goal** forbids) run for any
+  business; the domain catalog adds the rest — **code:** injection / empty-catch / hardcoded
+  secrets · **marketing:** unsourced superlatives / missing disclaimer · **contract:** ambiguous
+  quantifiers / one-sided clauses · **finance:** a regulated claim with no anchor. It **states
+  its own coverage** ("checks the loaded catalog + known anti-patterns; not exhaustive; does not
+  replace a human expert") — so it passes its own no-confident-nonsense test.
+- **Claim grounding** — tags every load-bearing claim **Grounded** (traces to a cited source or
+  the stated goal) · **Ungrounded** (confident, with nothing behind it) · **Contradicted** (does
+  what a non-goal forbids). The **universal source is the captured intent**, so it runs with
+  **zero domain pack** — a bakery, a SaaS, a law firm, all the same.
+
+**Report-only by default** — both are surfaced in `08b-redteam-grounding.md` and **do not change
+the verdict**, so existing runs stay byte-stable. Add **`--strict`** to *gate* on critical
+findings + contradictions (they open a red-team checkpoint; resolve with
+`--resolve "redteam: …"` — the human consciously accepts; the harness never bypasses it).
+
+```bash
+node bin/ed-agent.mjs "Add a payment retry flow and migrate the payments schema" \
+  --intent "cut failed-payment churn" --not "do not migrate the payments schema"
+# → REDTEAM: 2 critical · grounding 1G/0U/1C   (report-only — surfaced, verdict unchanged)
+
+node bin/ed-agent.mjs "…same…" --not "do not migrate the payments schema" --strict
+# → IN DELIBERATION: red-team checkpoint open — the contradiction must be accepted or fixed
+```
+
+Standalone, no lifecycle: **`ed_agent_redteam`** and **`ed_agent_ground`** (MCP), or
+`skills/redteam.mjs` + `skills/grounding.mjs` as a library.
+
 ## The nine stages + two checkpoints
 
 `intake → context → analyze →` **`◆FRAME`** `→ research → ledger → plan → produce → review →`
@@ -149,11 +186,12 @@ and applies the preferred mission / jurisdiction automatically.
 { "mcpServers": { "ed-agent": { "command": "npx", "args": ["-y", "github:Edwson/Ed-Agent", "ed-agent-mcp"] } } }
 ```
 
-Tools (9): `ed_agent_run` · `ed_agent_deliberate` (audit any artifact/diff — "should I trust
-this?") · `ed_agent_trust_scan` (fast trust + substance) · `ed_agent_optimize` (the 司令官
-review) · `ed_agent_quality_scan` · `ed_agent_missions` · `ed_agent_skills` · `ed_agent_remember`
-· `ed_agent_recall`. Enable with `npm install @modelcontextprotocol/sdk zod` (optional — the CLI
-and library are zero-dependency).
+Tools (11): `ed_agent_run` · `ed_agent_deliberate` (audit any artifact/diff — "should I trust
+this?") · `ed_agent_redteam` (mission-aware adversarial scan) · `ed_agent_ground` (claim
+grounding, three states) · `ed_agent_trust_scan` (fast trust + substance) · `ed_agent_optimize`
+(the 總導師 review) · `ed_agent_quality_scan` · `ed_agent_missions` · `ed_agent_skills` ·
+`ed_agent_remember` · `ed_agent_recall`. Enable with `npm install @modelcontextprotocol/sdk zod`
+(optional — the CLI and library are zero-dependency).
 
 **The host loop (deep deliberation):** `ed_agent_run` and `ed_agent_deliberate` return the open
 checkpoint questions. The host LLM (Claude/Cursor/Codex) discusses them **with you**, then calls

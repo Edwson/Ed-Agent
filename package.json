@@ -1,7 +1,7 @@
 {
   "name": "ed-agent",
-  "version": "0.4.0",
-  "description": "Ed Agent — a mission-swappable one-person army for build, review AND trust. One requirement (or any content) drives a nine-stage lifecycle with two deliberation checkpoints where it STOPS and surfaces the questions only a human can answer: was the intent captured or is it guessing the project, should you trust this (not 'is it correct'), does the local optimum serve the global goal, and is it substance or over-defensive ceremony. Squads swap by domain (code · marketing · contract · regulated-finance · optimize/總導師), with shared quality + trust disciplines, a learning memory, and a quantified ledger. Point it at a diff to ask 'should I trust this?'. The optimize squad + finance build quantify regulated surfaces against eds-mcp. Drop it into any bot via MCP or the AGENTS.md brief. Zero-dependency core.",
+  "version": "0.5.0",
+  "description": "Ed Agent — a mission-swappable one-person army for build, review AND trust. One requirement (or any content) drives a nine-stage lifecycle with two deliberation checkpoints where it STOPS and surfaces the questions only a human can answer: was the intent captured or is it guessing the project, should you trust this (not 'is it correct'), does the local optimum serve the global goal, and is it substance or over-defensive ceremony. Every build also runs a mission-aware red team (attacks the artifact for what this domain cares about) and claim-level grounding (Grounded / Ungrounded / Contradicted) — report-only by default, --strict to gate. Squads swap by domain (code · marketing · contract · regulated-finance · optimize/總導師), with shared quality + trust disciplines, a learning memory, and a quantified ledger. Point it at a diff to ask 'should I trust this?'. The optimize squad + finance build quantify regulated surfaces against eds-mcp. Drop it into any bot via MCP or the AGENTS.md brief. Zero-dependency core.",
   "type": "module",
   "bin": {
     "ed-agent": "bin/ed-agent.mjs",
@@ -56,6 +56,9 @@
     "ai-code-review",
     "deliberation",
     "intent-capture",
+    "red-team",
+    "adversarial-review",
+    "claim-grounding",
     "zero-dependency"
   ],
   "author": {
