@@ -54,9 +54,19 @@ DELIBERATION (the trust layer — Ed Agent stops at phase checkpoints and asks)
   --intent "<goal>"    the business goal (the outcome, not the task) — clears FRAME
   --done "<signal>"    what "done" means in business terms
   --not "<non-goals>"  out of scope, ;-separated (so a local optimum can't dig a global pit)
-  --resolve "<node>: <answer>"   answer a checkpoint (node = frame|trust); repeatable
+  --resolve "<node>: <answer>"   answer a checkpoint (node = frame|trust|redteam); repeatable
   --audit <file>       standalone: point at any artifact/diff and ask "should I trust this?"
                        (no build; prints trust + coherence + substance + the open questions)
+
+RED TEAM + CLAIM GROUNDING (v0.5 — runs every build, mission-aware, ~0 token)
+  An adversarial pass attacks the produced artifact for what THIS mission cares about
+  (code: injection/secrets/empty-catch; marketing: unsourced superlatives/missing
+  disclaimer; contract: ambiguous quantifiers/one-sided clauses; finance: regulated
+  claims with no anchor) plus the universal checks; and every load-bearing claim is
+  tagged Grounded / Ungrounded / Contradicted. Report-only by default (surfaced, does
+  not change the verdict). Add --strict to gate on critical findings + contradictions.
+  --strict             gate the verdict on critical findings / contradicted claims
+                       (resolve with --resolve "redteam: <answer>")
 
 OPTIONS
   --mission <finance|code|marketing|contract|optimize>   force the squad
@@ -117,5 +127,6 @@ run(requirement, {
   mission: flags['--mission'], jurisdiction: flags['--jurisdiction'],
   approve: flags['--approve'], signoff: flags['--signoff'],
   intent: flags['--intent'], done: flags['--done'], nonGoals: flags['--not'], resolve: flags['--resolve'],
+  strict: !!flags['--strict'],
   edsPath: flags['--eds'], outDir: flags['--out'], quiet: !!flags['--quiet'], record,
 }).then(() => process.exit(0)).catch((e) => { console.error('ed-agent error:', e && e.message ? e.message : e); process.exit(1); });
