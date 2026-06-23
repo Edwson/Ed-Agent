@@ -1,14 +1,13 @@
 # 06 · Step 2 — Adversarial debate (Reviewer B ⨯ Data/Logic D)
 
 ## Reviewer B challenges the work
-- On **Evidence & quantification**: "2 claim(s) carry no number — quantify them". Would a hard buyer (an OpenAI / Goldman decision-maker) sign off, or find the reason to say no?
-- On **Differentiation**: "9 AI-tone tell(s) + 0 vague term(s) make it generic". Would a hard buyer (an OpenAI / Goldman decision-maker) sign off, or find the reason to say no?
+- On **Evidence & quantification**: "1 claim(s) carry no number — quantify them". Would a hard buyer (an OpenAI / Goldman decision-maker) sign off, or find the reason to say no?
 - On **Audience fit**: "does not speak to a named reader or job-to-be-done". Would a hard buyer (an OpenAI / Goldman decision-maker) sign off, or find the reason to say no?
+- On **Differentiation**: "6 AI-tone tell(s) + 0 vague term(s) make it generic". Would a hard buyer (an OpenAI / Goldman decision-maker) sign off, or find the reason to say no?
 - The standing question: **how does this create a real benefit for the user / the business?** If it cannot be answered in one sentence with a number, it is not ready.
 
 ## Data/Logic D — quantify or flag
-- "In conclusion, our world-class KYC onboarding flow will seamlessly leverage cutting-edge technology to impr…" → attach a measured number (ROI / cost saved / conversion lift / time saved).
-- "We collect source of funds for enhanced due diligence under ASIC rules in Australia" → attach a measured number (ROI / cost saved / conversion lift / time saved).
+- "In conclusion, our world-class KYC onboarding will seamlessly leverage cutting-edge technology to improve t…" → attach a measured number (ROI / cost saved / conversion lift / time saved).
 
 ## eds-mcp evidence (regulated surface — real engine, not asserted)
 - **Jurisdiction / feature:** Australia · kyc

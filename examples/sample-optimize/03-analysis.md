@@ -2,14 +2,10 @@
 
 ## Sub-requirements
 - In conclusion
-- our world-class KYC onboarding flow will seamlessly leverage cutting-edge technology to improve the customer experience
-- unlock tremendous value
-- We collect source of funds for enhanced due diligence under ASIC rules in Australia
-- It is robust
-- best-in-class
-- a true game-changer
+- our world-class KYC onboarding will seamlessly leverage cutting-edge technology to improve the experience
+- unlock value under ASIC rules in Australia
 
-## Concerns to verify (Optimize / review (總導師))
+## Concerns to verify (Optimize / review (grand-mentor · 総監督))
 - Clarity & structure
 - Evidence & quantification
 - Differentiation
