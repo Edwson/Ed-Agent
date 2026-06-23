@@ -1,4 +1,4 @@
-// missions/optimize.mjs — the 總導師 review squad. Takes ANY existing content
+// missions/optimize.mjs — the grand-mentor review squad (総監督レビュー). Takes ANY existing content
 // (a deck, a case study, a landing page, a clause) and runs the SOP:
 // Step 1 blind-score diagnostic → Step 2 adversarial debate → Step 3 humanize
 // → final optimized version, in the exact output format. Constraints: ban AI-tone
@@ -37,7 +37,7 @@ function getOpt(brief, ctx) {
 
 export const optimize = {
   id: 'optimize',
-  name: 'Optimize / review (總導師)',
+  name: 'Optimize / review (grand-mentor · 総監督)',
   detect: /\b(optimi[sz]e|review|critique|improve|polish|sharpen|tighten|rewrite|proofread|feedback|de-?ai|humani[sz]e|score this|rate this|make this better)\b|優化|診斷|潤稿|重構文案|盲測|批判|去\s?ai|評分|審稿|強化文案/i,
   build: 'eds-mcp', // wires the engine so the Data officer can quantify finance surfaces
   squad: [
@@ -106,7 +106,7 @@ export const optimize = {
   produce(brief, ctx) {
     const { content, score, scan } = getOpt(brief, ctx);
     const ht = humanTone(content);
-    const optimized = `# 優化後的最終版本 / Optimized version\n\n> Deterministic de-AI pass (${ht.removed} filler phrase(s) stripped) + a structure to finish. The creative rewrite — the part that needs taste — is the operator's or the host LLM's; the agents do not invent facts.\n\n## Cleaned draft\n\n${ht.text || content}\n\n## Structure to lift it to the top 1%\n1. **Open with the single-minded proposition** — the one promise, in one line, with a number.\n2. **Lead each claim with its evidence** — every benefit gets a measured figure beside it (the Data officer flagged the gaps in Step 2).\n3. **Cut the filler** — ${scan.length ? 'remove: ' + scan.slice(0, 8).map((h) => '`' + h.term + '`').join(', ') : 'voice is already clean'}.\n4. **Name the reader** — speak to the exact buyer / job-to-be-done, not "users" in general.\n5. **Make it findable** — one head term, repeated with intent; scannable headings.\n`;
+    const optimized = `# Optimized version / 最適化版\n\n> Deterministic de-AI pass (${ht.removed} filler phrase(s) stripped) + a structure to finish. The creative rewrite — the part that needs taste — is the operator's or the host LLM's; the agents do not invent facts.\n\n## Cleaned draft\n\n${ht.text || content}\n\n## Structure to lift it to the top 1%\n1. **Open with the single-minded proposition** — the one promise, in one line, with a number.\n2. **Lead each claim with its evidence** — every benefit gets a measured figure beside it (the Data officer flagged the gaps in Step 2).\n3. **Cut the filler** — ${scan.length ? 'remove: ' + scan.slice(0, 8).map((h) => '`' + h.term + '`').join(', ') : 'voice is already clean'}.\n4. **Name the reader** — speak to the exact buyer / job-to-be-done, not "users" in general.\n5. **Make it findable** — one head term, repeated with intent; scannable headings.\n`;
     const diff = `# Humanize diff (Copy C)\n\n- Filler phrases removed: **${ht.removed}**\n- AI-tone tells flagged: ${scan.length ? scan.map((h) => `\`${h.term}\`×${h.count}`).join(', ') : 'none'}\n- Original blind score: **${score.overall}/100** → fix the three fatal flaws above to raise it.\n`;
     ctx.wa('07-build/optimized-version.md', optimized);
     ctx.wa('07-build/humanized-diff.md', diff);
@@ -128,14 +128,14 @@ export const optimize = {
     const { score, scan, gaps, finance } = getOpt(brief, ctx);
     const aiTotal = scan.reduce((a, h) => a + h.count, 0);
     const md = `# 09 · Final output (Executor A) — the three-part format\n\n` +
-      `## 【專家診斷回饋】 Expert diagnostic (bullets)\n` +
+      `## Expert diagnostic / 専門家による診断 (bullets)\n` +
       `- Blind score: **${score.overall}/100**\n` +
       score.fatalFlaws.map((f) => `- Fatal flaw — **${f.dim}** (${f.score}): ${f.why}`).join('\n') + '\n' +
       `- AI-tone filler to cut: ${aiTotal ? scan.slice(0, 8).map((h) => '`' + h.term + '`').join(', ') : 'none'}\n` +
       `- Claims missing a number: ${gaps.length}\n\n` +
-      `## 【優化後的最終版本】 Optimized version (ready to use)\n` +
+      `## Optimized version / 最適化版 (ready to use)\n` +
       `- See \`07-build/optimized-version.md\` — de-AI'd draft + the structure to finish to the top 1%.\n\n` +
-      `## 【商業價值評估】 Business-value assessment\n` +
+      `## Business-value assessment / ビジネス価値評価\n` +
       `- Each claim must tie to a business outcome — cost reduction, ROI lift, conversion, or hours saved. The Data officer flagged **${gaps.length}** place(s) where the number is missing; attach measured figures there.\n` +
       (finance ? `- Regulated surface (${finance.feature} · ${finance.rule}): quantified against eds-mcp in \`06-plan.md\` — guardrail components + token-contrast pass rate are shown, not asserted.\n` : `- No regulated-finance surface here, so the value case is commercial: lead with the single metric the hard buyer cares about.\n`) +
       `\n_What the squad did: diagnose, debate, de-AI, quantify, structure. What stays human: the creative rewrite and the two gates._\n`;

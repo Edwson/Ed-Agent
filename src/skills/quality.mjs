@@ -1,6 +1,6 @@
 // skills/quality.mjs — the quality disciplines every mission shares. Deterministic,
 // zero-dependency. Enforces the house rules: ban AI-tone filler, quantify or flag,
-// no blind praise. Powers the optimize (總導師) mission and folds into every review.
+// no blind praise. Powers the optimize (grand-mentor · 総監督) mission and folds into every review.
 import { ambiguityScan } from './logic.mjs';
 
 // ── AI-tone: the filler/transition words a top reviewer treats as a tell ──
