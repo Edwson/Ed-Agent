@@ -1,6 +1,7 @@
 // missions/contract.mjs — the legal squad: Senior Lawyer · Risk-Control Officer ·
 // Negotiation Expert · Semantic-Logic reviewer.
 import { decompose, crossCompare, renderFindings, ambiguityScan } from '../skills/logic.mjs';
+import { qualityBlock } from '../skills/quality.mjs';
 import { uniq } from '../util.mjs';
 
 const KB = [
@@ -63,14 +64,17 @@ export const contract = {
     ctx.wa('07-build/risk-register.md', risk);
     ctx.wa('07-build/negotiation-positions.md', pos);
     ctx.wa('07-build/_manifest.md', `# 07 · Produce\n\nWritten: risk-register.md, negotiation-positions.md (${brief.concerns.length} terms).\n`);
+    ctx._produced = risk + pos;
     return { text: risk + pos, out: '07-build/', files: 2, summary: `risk register + positions for ${brief.concerns.length} terms` };
   },
 
   review(brief, ctx) {
     const amb = ambiguityScan(brief.requirement);
     const md = `# 08 · Semantic & logic review (Semantic-Logic Reviewer)\n\n## Ambiguous / undefined terms\n${amb.length ? amb.map((a) => `- "${a.term}" — ${a.why}`).join('\n') : '- none flagged in the brief (re-run against the full draft)'}\n\n## Logic checks\n- every obligation has a corresponding remedy\n- defined terms are used consistently (capitalisation)\n- cross-references resolve; no orphaned definitions\n- numbers, dates and currencies are exact and consistent\n`;
-    const out = ctx.wa('08-review.md', md);
-    return { text: md, out, issues: amb.length, summary: `${amb.length} ambiguit(ies) flagged` };
+    const qb = qualityBlock(ctx._produced || brief.requirement, { label: 'the risk register + positions' });
+    const full = md + qb.md;
+    const out = ctx.wa('08-review.md', full);
+    return { text: full, out, issues: amb.length + qb.issues, summary: `${amb.length} ambiguit(ies) flagged · ${qb.verdict.label}` };
   },
 
   certify(brief, ctx) {

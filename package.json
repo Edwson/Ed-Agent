@@ -1,7 +1,7 @@
 {
   "name": "ed-agent",
-  "version": "0.2.0",
-  "description": "Ed Agent — a mission-swappable one-person development army. One requirement drives nine human-gated lifecycle stages with a squad that swaps by domain (code · marketing · contract · regulated-finance), a learning memory that remembers your preferences, real artifacts at every stage, and a quantified Ed_agents_Claude.md ledger. Drop it into any bot via MCP or the AGENTS.md brief. Core is zero-dependency.",
+  "version": "0.4.0",
+  "description": "Ed Agent — a mission-swappable one-person army for build, review AND trust. One requirement (or any content) drives a nine-stage lifecycle with two deliberation checkpoints where it STOPS and surfaces the questions only a human can answer: was the intent captured or is it guessing the project, should you trust this (not 'is it correct'), does the local optimum serve the global goal, and is it substance or over-defensive ceremony. Squads swap by domain (code · marketing · contract · regulated-finance · optimize/總導師), with shared quality + trust disciplines, a learning memory, and a quantified ledger. Point it at a diff to ask 'should I trust this?'. The optimize squad + finance build quantify regulated surfaces against eds-mcp. Drop it into any bot via MCP or the AGENTS.md brief. Zero-dependency core.",
   "type": "module",
   "bin": {
     "ed-agent": "bin/ed-agent.mjs",
@@ -25,6 +25,8 @@
   "scripts": {
     "start": "node bin/ed-agent.mjs",
     "example": "node bin/ed-agent.mjs \"Build a KYC onboarding step for an Australian retail broker — Enhanced Due Diligence with source of funds\"",
+    "example:optimize": "node bin/ed-agent.mjs --mission optimize \"In conclusion, our world-class KYC onboarding will seamlessly leverage cutting-edge technology to improve the experience and unlock value under ASIC rules in Australia.\"",
+    "example:deliberate": "node bin/ed-agent.mjs \"Add a payment retry flow\" --intent \"cut failed-payment churn\" --not \"no auto-charge without consent; do not change the payments schema\"",
     "test": "node test/ed-agent.test.mjs",
     "test:mcp": "node mcp/test-mcp.mjs",
     "serve": "node mcp/server.mjs"
@@ -45,6 +47,15 @@
     "design-ops",
     "human-in-the-loop",
     "eds-mcp",
+    "content-optimization",
+    "critique",
+    "quality-gate",
+    "anti-ai-tone",
+    "code-trust",
+    "code-review",
+    "ai-code-review",
+    "deliberation",
+    "intent-capture",
     "zero-dependency"
   ],
   "author": {

@@ -15,7 +15,7 @@ const SEED = `# Ed_agents_Claude.md — Ed Agent working memory & I/O ledger
 - Operator: Ed Chen — design judgment + human sign-off stay with the operator.
 - Engine: the build half (design / develop / QA / certify) runs on the eds-mcp design system.
 - Conventions: tokens-only styling, reduced-motion + WCAG 2.1 AA, every claim carries a source.
-- Honesty: agents ingest / analyse / research / scaffold / check; the human holds the gates.
+- Honesty: agents ingest / analyse / research / scaffold / check; the human holds the two gates and the two deliberation checkpoints (FRAME · TRUST).
 
 <!-- LAST-BRIEF -->
 _No brief recorded yet._
@@ -65,14 +65,16 @@ export function commit(memoryPath, run) {
     .map((s) => `| ${s.stage} | ${s.agent} | ${fmt(s.inTok)} | ${fmt(s.outTok)} | ${s.artifact || '—'} |`)
     .join('\n');
   const gates = run.gates.map((g) => (g.status === 'approved' ? `✓ ${g.name} (by ${g.by})` : `⏸ ${g.name} (pending)`)).join(' · ');
+  const cps = run.checkpoints || [];
+  const delib = cps.length ? `\n- **Deliberation:** ${cps.map((cp) => (cp.status === 'open' ? `◆ ${cp.name} (${cp.questions.length}Q open)` : `✓ ${cp.name}`)).join(' · ')}` : '';
   const entry = `## Run ${todayISO()} · ${run.slug}
 
 - **Requirement:** ${run.requirement}
 - **Mission:** ${run.mission || '—'}
 - **Detected:** ${run.domain} · ${run.jurisdictionName}
 - **Research:** ${run.coveragePct}% coverage · ${run.conflicts} conflict(s) quarantined
-- **Gates:** ${gates}
-- **Shippable:** ${run.shippable ? 'yes — all gates cleared' : 'no — human gate(s) pending'}
+- **Gates:** ${gates}${delib}
+- **Shippable:** ${run.shippable ? 'yes — gates + deliberation cleared' : 'no — gate(s) or open checkpoint(s) pending'}
 
 | Stage | Agent | In (est) | Out (est) | Artifact |
 |---|---|---:|---:|---|

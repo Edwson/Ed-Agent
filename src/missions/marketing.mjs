@@ -1,6 +1,7 @@
 // missions/marketing.mjs — the growth squad: Creative Director · Conversion
 // Analyst · Consumer Psychologist · SEO.
 import { decompose, crossCompare, renderFindings } from '../skills/logic.mjs';
+import { qualityBlock } from '../skills/quality.mjs';
 import { uniq } from '../util.mjs';
 
 const KB = [
@@ -68,14 +69,17 @@ export const marketing = {
     ctx.wa('07-build/seo-plan.md', seo);
     ctx.wa('07-build/copy-outline.md', copy);
     ctx.wa('07-build/_manifest.md', `# 07 · Produce\n\nWritten: conversion-model.md, seo-plan.md, copy-outline.md. Projected paid (assumed rates): ${paid}.\n`);
+    ctx._produced = funnel + seo + copy;
     return { text: funnel + seo + copy, out: '07-build/', files: 3, summary: `funnel model (→ ${paid} paid, assumed) · SEO plan · copy outline` };
   },
 
   review(brief, ctx) {
     const claims = (brief.requirement.match(/\b(\d+%|\d+x|best|fastest|guaranteed|#1|leading)\b/gi) || []);
     const md = `# 08 · Conversion + claims review (Consumer Psychologist)\n\n## Persuasion principles applied (ethically)\n- social proof, authority, scarcity — only where true\n- no dark patterns (no fake urgency, no forced continuity)\n\n## Unsubstantiated-claim flags\n${claims.length ? claims.map((c) => `- "${c}" — substantiate or remove (FTC endorsement guides)`).join('\n') : '- none flagged'}\n\n## Measurement\n- conversion event + funnel defined before launch (GA4)\n`;
-    const out = ctx.wa('08-review.md', md);
-    return { text: md, out, issues: claims.length, summary: `${claims.length} claim(s) to substantiate` };
+    const qb = qualityBlock(ctx._produced || brief.requirement, { label: 'the landing copy + funnel' });
+    const full = md + qb.md;
+    const out = ctx.wa('08-review.md', full);
+    return { text: full, out, issues: claims.length + qb.issues, summary: `${claims.length} claim(s) to substantiate · ${qb.verdict.label} ${qb.score.overall}/100` };
   },
 
   certify(brief, ctx) {

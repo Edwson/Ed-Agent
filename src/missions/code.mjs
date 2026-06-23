@@ -1,5 +1,6 @@
 // missions/code.mjs — the engineering squad: Architect · Security · QA · Doc engineer.
 import { decompose, crossCompare, renderFindings, ambiguityScan } from '../skills/logic.mjs';
+import { qualityBlock } from '../skills/quality.mjs';
 
 const KB = [
   { group: 'Input validation', source: 'OWASP', ref: 'ASVS V5', claim: 'All input must be validated against an allow-list at the trust boundary before use.' },
@@ -67,6 +68,7 @@ export const code = {
     ctx.wa('07-build/modules.md', modules);
     const man = `# 07 · Produce\n\nWritten: test-plan.md, README-draft.md, modules.md (${subs.length || 1} modules).\n`;
     ctx.wa('07-build/_manifest.md', man);
+    ctx._produced = readme + modules;
     return { text: testPlan + readme + modules, out: '07-build/', files: 3, summary: `${subs.length || 1} modules · test plan + README drafted` };
   },
 
@@ -74,8 +76,10 @@ export const code = {
     const stride = brief.concerns.map((c) => `- **${c}** — Spoofing/Tampering/Repudiation/Info-disclosure/DoS/Elevation: assess + mitigate`).join('\n');
     const amb = ambiguityScan(brief.requirement);
     const md = `# 08 · Security review (Security)\n\n## STRIDE over the concerns\n${stride}\n\n## Mitigations (baseline)\n- validate input at the trust boundary (allow-list)\n- secrets from a managed store, never committed\n- encrypt sensitive data at rest + in transit\n- fail closed; log with context; no internal leakage\n- pin + scan dependencies\n\n## Ambiguities in the requirement\n${amb.length ? amb.map((a) => `- "${a.term}" — ${a.why}`).join('\n') : '- none flagged'}\n`;
-    const out = ctx.wa('08-review.md', md);
-    return { text: md, out, issues: amb.length, summary: `${brief.concerns.length} threat surfaces · ${amb.length} ambiguit(ies)` };
+    const qb = qualityBlock(ctx._produced || brief.requirement, { label: 'the README + docs' });
+    const full = md + qb.md;
+    const out = ctx.wa('08-review.md', full);
+    return { text: full, out, issues: amb.length + qb.issues, summary: `${brief.concerns.length} threat surfaces · ${amb.length} ambiguit(ies) · ${qb.verdict.label}` };
   },
 
   certify(brief, ctx) {

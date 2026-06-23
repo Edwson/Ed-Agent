@@ -3,9 +3,10 @@ import { finance } from './finance.mjs';
 import { code } from './code.mjs';
 import { marketing } from './marketing.mjs';
 import { contract } from './contract.mjs';
+import { optimize } from './optimize.mjs';
 
-// order = tie-break preference
-export const MISSIONS = [finance, contract, marketing, code];
+// order = tie-break preference (optimize first: a review/optimize intent wins a tie)
+export const MISSIONS = [optimize, finance, contract, marketing, code];
 export const missionById = (id) => MISSIONS.find((m) => m.id === id) || null;
 
 /** Pick the mission: explicit flag wins; else score keyword hits; default code. */

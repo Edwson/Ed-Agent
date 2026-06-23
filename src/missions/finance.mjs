@@ -68,8 +68,13 @@ export const finance = {
 
   review(brief, ctx) {
     const q = qa(ctx.engine, brief);
-    const out = ctx.wa('08-review.md', q.markdown);
-    return { text: q.markdown, out, issues: q.errors || 0, summary: q.wired ? `${q.errors} lint error(s) · ${q.a11yChecked} a11y · ${q.contrastChecked} contrast pairs` : 'contract-only' };
+    const clean = (q.errors || 0) === 0 && (q.contrastFail || 0) === 0;
+    const verdictLine = q.wired
+      ? (clean ? `PASS — 0 lint errors, ${q.contrastFail || 0} contrast fail(s); clears the system gate.` : `REWORK — ${q.errors} lint error(s) + ${q.contrastFail || 0} contrast fail(s); fix before sign-off.`)
+      : 'Contract-only — eds-mcp not wired, so no machine verdict (wire --eds to enforce).';
+    const full = q.markdown + `\n## Quality discipline — no blind praise\n\n**Verdict:** ${verdictLine}\n`;
+    const out = ctx.wa('08-review.md', full);
+    return { text: full, out, issues: q.errors || 0, summary: q.wired ? `${clean ? 'PASS' : 'REWORK'} · ${q.errors} lint · ${q.a11yChecked} a11y · ${q.contrastChecked} contrast pairs` : 'contract-only' };
   },
 
   certify(brief, ctx) {

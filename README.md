@@ -5,27 +5,37 @@
 <h1 align="center">Ed Agent</h1>
 
 <p align="center">
-  <b>A mission-swappable one-person development army.</b><br>
+  <b>A mission-swappable one-person army — for build, review <i>and</i> trust.</b><br>
   ▶ <a href="img/ed_agent_Intro.mp4">Watch the 30-second intro</a> · MIT · zero-dependency core
 </p>
 
-Give it one plain-English requirement and it drives the whole lifecycle through **nine
-human-gated stages** — with a **squad that swaps to the kind of work**, a **memory that learns
-your preferences**, real artifacts at every stage, and a quantified `Ed_agents_Claude.md`
-ledger. Drop it into any bot via **MCP** or the **`AGENTS.md`** brief. The core is
-zero-dependency (Node 18+).
+Once AI writes the code, the job stops being *"how do I write this"* and becomes *"should I
+**trust** this?"* Ed Agent is built for that shift. It drives one requirement — **or any
+content, or a diff** — through **nine stages** with a **swappable squad**, but it **stops at two
+deliberation checkpoints** and surfaces the questions only a human can answer:
+
+- **Was the intent captured, or is it guessing the project?** Unstated intent is the **#1 flagged risk**, not a silent guess.
+- **Should you trust this** (not *"is it correct"*) — provenance, verification, blast radius, the confidence-vs-evidence gap.
+- **Does the local optimum serve the global goal?** It flags the *technically-right, business-wrong* decision that digs a global pit.
+- **Is it substance, or over-defensive ceremony?** The "looks-rigorous, all-filler" detector.
+
+Plus a **memory that learns your preferences**, **quality disciplines** (ban AI-tone filler ·
+quantify-or-flag · no blind praise), real artifacts at every stage, and a quantified ledger.
+Drop it into any bot via **MCP** or the **`AGENTS.md`** brief. Zero-dependency core (Node 18+).
 
 > _Click the mascot above to watch the intro._
 
-> **Honest by construction.** The squad ingests, analyses, researches, produces and reviews.
-> **Judgment and the two gates stay human** — the harness *records* a gate, it never bypasses
-> one. Velocity, not autonomy.
+> **Honest by construction.** Ed Agent does not pretend to *understand* your business — a
+> harness can't. It forces the intent to be captured, runs deterministic trust / coherence /
+> substance checks, and **puts the right question at the right node**. The judgment, the two
+> checkpoints, and the two gates stay human. Velocity, not autonomy.
 
 ```bash
 node bin/ed-agent.mjs "Build a REST API for user onboarding with rate limiting"   # → code squad
 node bin/ed-agent.mjs "Launch a landing page for a new savings product"           # → marketing squad
 node bin/ed-agent.mjs "Draft an NDA with a 12-month liability cap"                # → contract squad
 node bin/ed-agent.mjs "KYC onboarding with EDD source of funds"                   # → finance squad (eds-mcp)
+node bin/ed-agent.mjs --mission optimize --input case-study.md                    # → optimize squad (review)
 ```
 
 ## The squad swaps to the mission
@@ -38,18 +48,83 @@ The mission is auto-detected from the requirement (override with `--mission`):
 | **Marketing** | Creative Director · Conversion Analyst · Consumer Psychologist · SEO | creative brief · conversion model · SEO plan · copy outline |
 | **Contract** | Senior Lawyer · Risk-Control Officer · Negotiator · Semantic-Logic reviewer | clause map · risk register · negotiation positions · ambiguity review |
 | **Finance** *(default)* | Planning · Regulation · Data · Development · QA · Risk & Governance | eds-mcp compliant build — scaffolded HTML/CSS/JS + conformance tests |
+| **Optimize** *(總導師)* | Executor A · Reviewer B · Copy C · Data/Logic D · Market/SEO E | blind-score diagnostic · adversarial debate · de-AI'd draft · three-part output |
 
 Browse committed runs in **[`examples/`](./examples/)** — one per mission.
 
-## The nine stages
+## Review & optimize anything — the 總導師 squad
 
-`intake → context → analyze → research → ledger → plan → produce → review → certify`
+The optimize mission takes **existing content** (a deck, a case study, a landing page, a clause)
+and runs the review SOP, so Ed Agent is a *thinking* unit, not only a *build* unit:
 
-The middle five swap their content per mission; the spine is universal. The **Research**
-stage gathers evidence, **cross-compares sources**, **compresses each claim to its
-load-bearing clause**, and **quarantines unverified claims** (it never presents one as fact).
-The **Plan** and **Certify** stages each hold a **human gate** — a run stays *"not yet
-shippable"* until a named approver clears it.
+1. **Diagnostic** — the squad blind-scores the content across five dimensions and names the **three most fatal flaws**.
+2. **Adversarial debate** — Reviewer B (a hard buyer) and Data/Logic D challenge it: *how does this create a real benefit, with a number?*
+3. **Humanize** — Copy C strips the AI-tone filler (a deterministic de-AI pass) and lays out the structure to finish.
+4. **Optimized version** — assembled in the exact three-part format: **【專家診斷回饋】 / 【優化後的最終版本】 / 【商業價值評估】**.
+
+```bash
+node bin/ed-agent.mjs --mission optimize "In conclusion, our world-class platform seamlessly leverages cutting-edge synergy to improve value."
+# → REWORK (low blind score): AI-tone filler flagged · claims missing numbers · fatal flaws named
+```
+
+When the content is a **regulated-finance surface**, the Data/Logic officer **calls the
+real [eds-mcp](https://github.com/Edwson/eds-mcp) engine** to *show* the numbers instead of
+asserting them — the guardrail components the surface should map to, the regulatory anchors for
+the jurisdiction, and the token-contrast WCAG pass rate of the system it would ship on.
+
+## The quality disciplines — folded into every mission
+
+Three house rules run in **every** review, not just optimize (the same `skills/quality.mjs`):
+
+- **Ban AI-tone filler** — an EN + 中文 scanner flags `in conclusion`, `leverage`, `seamless`, `總之`, `賦能`, … so the voice stays human.
+- **Quantify or flag** — any sentence that asserts a benefit with no number is surfaced for a measured figure (ROI / cost / conversion / time saved).
+- **No blind praise** — a blind score (five dimensions) yields a **PASS / REWORK** verdict; mediocre work is told it *"would not pass a top-tier interview/review yet,"* with the reasons.
+
+## The trust & deliberation layer
+
+The hard problems once AI writes the code aren't syntax — they're **trust, lost intent, blind
+global judgment, and plausible-nonsense defensive code**. Ed Agent stops at **two deliberation
+checkpoints** and pulls you into the reasoning instead of rubber-stamping:
+
+| Checkpoint | Asks | Catches |
+|---|---|---|
+| **FRAME** *(after analyze)* | Is the business intent captured, or is the agent guessing the project? | lost intent — the agent inferring the goal from text alone |
+| **TRUST** *(after review)* | Should you trust it? Does the local optimum serve the global goal? Substance or ceremony? | the *technically-right, business-wrong* decision · over-defensive filler · LOW-trust output |
+
+A run **stays IN DELIBERATION — not shippable — until you answer the open questions**, even when
+both sign-off gates are cleared. State the intent up front; resolve the rest:
+
+```bash
+node bin/ed-agent.mjs "Add a payment retry flow"        # → IN DELIBERATION: "What is the business goal?"
+node bin/ed-agent.mjs "Add a payment retry flow" \
+  --intent "cut failed-payment churn" \
+  --not "no auto-charge without consent; do not change the payments schema" \
+  --resolve "trust: reviewed, accept the blast radius"   # → checkpoints clear
+```
+
+**Point it at an existing artifact / diff — "should I trust this?"** (no build):
+
+```bash
+node bin/ed-agent.mjs --audit pull-request.diff --intent "cut failed-payment churn" \
+                      --not "do not change the payments schema"
+# → Trust: LOW · ⚠ local optimum: "migrate the payments schema" does a declared NON-GOAL
+#   · Substance: CEREMONY (empty catch, TODO, grand claims with no numbers) · open questions
+```
+
+The four assessors live in **`skills/trust.mjs`** (intent capture · trust score · global
+coherence · substance scan) — all deterministic, all framed as *questions for you*, none of
+them making the call.
+
+## The nine stages + two checkpoints
+
+`intake → context → analyze →` **`◆FRAME`** `→ research → ledger → plan → produce → review →`
+**`◆TRUST`** `→ certify`
+
+The middle five swap their content per mission; the spine is universal. **Research**
+cross-compares sources, compresses each claim to its load-bearing clause, and quarantines
+unverified ones. **Plan** and **Certify** each hold a **human sign-off gate**; **FRAME** and
+**TRUST** are **deliberation checkpoints**. A run is shippable only when **both gates are
+cleared AND both checkpoints are closed**.
 
 ## It learns you
 
@@ -74,9 +149,16 @@ and applies the preferred mission / jurisdiction automatically.
 { "mcpServers": { "ed-agent": { "command": "npx", "args": ["-y", "github:Edwson/Ed-Agent", "ed-agent-mcp"] } } }
 ```
 
-Tools: `ed_agent_run · ed_agent_missions · ed_agent_skills · ed_agent_remember ·
-ed_agent_recall`. Enable with `npm install @modelcontextprotocol/sdk zod` (optional — the CLI
+Tools (9): `ed_agent_run` · `ed_agent_deliberate` (audit any artifact/diff — "should I trust
+this?") · `ed_agent_trust_scan` (fast trust + substance) · `ed_agent_optimize` (the 總導師
+review) · `ed_agent_quality_scan` · `ed_agent_missions` · `ed_agent_skills` · `ed_agent_remember`
+· `ed_agent_recall`. Enable with `npm install @modelcontextprotocol/sdk zod` (optional — the CLI
 and library are zero-dependency).
+
+**The host loop (deep deliberation):** `ed_agent_run` and `ed_agent_deliberate` return the open
+checkpoint questions. The host LLM (Claude/Cursor/Codex) discusses them **with you**, then calls
+the tool again with your answers in `intent` / `resolve[]` to close the deliberation. The engine
+surfaces the questions; the conversation — and the decision — stay between you and the host.
 
 **Any other LLM (Hermes, …):** paste the operating contract from **[`AGENTS.md`](./AGENTS.md)**
 into the system prompt — the host then *behaves* as Ed Agent.
@@ -85,10 +167,11 @@ into the system prompt — the host then *behaves* as Ed Agent.
 
 [**eds-mcp**](https://github.com/Edwson/eds-mcp) is the **design-system engine** (it scaffolds
 compliant finance UI). **Ed Agent** is the **special-ops orchestrator** that runs the whole
-lifecycle across *any* domain — and calls eds-mcp only for the finance mission's build. The
-build engine resolves from `--eds <path>`, `ED_AGENT_EDS_MCP`, or a sibling `../eds-mcp`; if
-absent, the finance build runs in honest contract-only mode and every other mission is
-unaffected.
+lifecycle across *any* domain — and calls eds-mcp **twice over**: the **finance** mission drives
+it to *build* compliant UI, and the **optimize** mission calls it to *quantify* a regulated
+surface under review (guardrail mapping · regulatory anchors · WCAG token-contrast). The engine
+resolves from `--eds <path>`, `ED_AGENT_EDS_MCP`, or a sibling `../eds-mcp`; if absent, both run
+in honest contract-only mode and every other mission is unaffected.
 
 ## Tests
 

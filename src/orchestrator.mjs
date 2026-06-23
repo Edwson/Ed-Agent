@@ -13,6 +13,9 @@ import { recall as recallMemory, checkpoint, commit } from './ledger.mjs';
 import * as prefs from './prefs.mjs';
 import { gate, allCleared, gateLine } from './gates.mjs';
 import { loadEngine } from './edsBridge.mjs';
+import { captureIntent } from './skills/trust.mjs';
+import { frameAssessment, trustAssessment } from './deliberate.mjs';
+import { checkpoint as makeCheckpoint, allCheckpointsCleared, openCheckpoints, openQuestions, checkpointLine, parseResolutions } from './checkpoints.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..');
@@ -28,6 +31,8 @@ export async function run(requirement, opts = {}) {
   if (opts.record && opts.record.length) prefs.record(memoryPath, opts.record);
   const pref = prefs.recall(memoryPath);
   const { opts: o, applied } = prefs.apply(pref, opts);
+  const resolutions = parseResolutions(o.resolve);
+  const intent = captureIntent(requirementText, o);
 
   const intk = intake(requirementText, o);
   const mission = intk.mission;
@@ -64,7 +69,13 @@ export async function run(requirement, opts = {}) {
   tick('analyze', stageOwnerName(mission, 'plan'), requirementText, a3, wa('03-analysis.md', a3));
   log(`[3/9] ${c.cyan('ANALYZE')}   ${c.dim(stageOwnerName(mission, 'plan'))}  → ${ana.subRequirements.length} sub-reqs · ${ana.concerns.length} concerns`);
 
-  const brief = { ...intk, subRequirements: ana.subRequirements, concerns: ana.concerns, constraints: ana.constraints, assumptions: ana.assumptions, prefs: pref };
+  // CP1 · FRAME — is the intent captured, or is the agent guessing the project?
+  const fa = frameAssessment(requirementText, intent);
+  const cp1 = makeCheckpoint('frame', 'Frame the problem', 'after-analyze', { questions: fa.questions, assessment: fa.md, resolution: resolutions.frame });
+  wa('c1-frame-checkpoint.md', fa.md + (cp1.questions.length ? `\n## Open questions\n${cp1.questions.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n` : '\n_Cleared — no open question._\n'));
+  log(`  ${cp1.status === 'open' ? c.gold('◆ FRAME') : c.green('◇ FRAME')}    ${c.dim('checkpoint')}  → ${checkpointLine(cp1)}`);
+
+  const brief = { ...intk, intent, subRequirements: ana.subRequirements, concerns: ana.concerns, constraints: ana.constraints, assumptions: ana.assumptions, prefs: pref };
 
   // engine (finance only)
   const engine = mission.build === 'eds-mcp' ? await loadEngine(o) : { wired: false };
@@ -103,22 +114,44 @@ export async function run(requirement, opts = {}) {
   const cf = mission.certify(brief, ctx);
   const signoffGate = gate('Certification sign-off', stageOwnerName(mission, 'certify') + ' → human', o.signoff);
   const gates = [approveGate, signoffGate];
-  const shippable = allCleared(gates);
-  const a10 = `# 10 · Certification\n\n- Mission: **${mission.name}**\n- Conformance / checklist: ${cf.summary}\n- Review issues: ${rv.issues || 0}\n- Research coverage: ${r.coverage}%\n\n## Gates\n${gates.map((g) => '- ' + gateLine(g)).join('\n')}\n\n## Verdict\n**${shippable ? 'SHIPPABLE — all human gates cleared.' : 'NOT YET SHIPPABLE — human gate(s) pending. The harness does not bypass a gate.'}**\n\n_What the ${mission.name} squad did: intake, analysis, sourced research, plan, produce, review. What stays human: judgment and the two gates above._\n`;
+
+  // CP2 · TRUST & GLOBAL — should you trust it, and does the local optimum serve the goal?
+  const sig = {
+    text: pr.text || ctx._produced || requirementText,
+    provenance: (engine.wired || (r.sources && r.sources.length)) ? 'derived' : 'inferred',
+    verified: (mission.build === 'eds-mcp' && engine.wired) || (cf.count > 0),
+    testsScaffolded: cf.count || 0, reviewIssues: rv.issues || 0,
+  };
+  const ta = trustAssessment({ text: sig.text, decisions: ana.subRequirements, intent, sig });
+  const cp2 = makeCheckpoint('trust', 'Trust & global coherence', 'after-review', { questions: ta.questions, assessment: ta.md, resolution: resolutions.trust });
+  wa('c2-trust-checkpoint.md', ta.md + (cp2.questions.length ? `\n## Open questions\n${cp2.questions.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n` : '\n_Cleared — no open question._\n'));
+
+  const checkpoints = [cp1, cp2];
+  const shippable = allCleared(gates) && allCheckpointsCleared(checkpoints);
+  const a10 = `# 10 · Certification\n\n- Mission: **${mission.name}**\n- Conformance / checklist: ${cf.summary}\n- Trust: **${ta.trust.level}** (${ta.trust.score}/100) · Substance: **${ta.substance.verdict}** (${ta.substance.substanceScore}/100)\n- Review issues: ${rv.issues || 0}\n- Research coverage: ${r.coverage}%\n\n## Gates\n${gates.map((g) => '- ' + gateLine(g)).join('\n')}\n\n## Deliberation checkpoints\n${checkpoints.map((cp) => '- ' + checkpointLine(cp)).join('\n')}\n\n## Verdict\n**${shippable ? 'SHIPPABLE — gates cleared, deliberation closed.' : 'NOT YET SHIPPABLE — ' + (openCheckpoints(checkpoints).length ? openCheckpoints(checkpoints).length + ' open checkpoint(s) need your judgment; ' : '') + 'gate(s)/checkpoint(s) pending. The harness does not bypass them.'}**\n\n_What the ${mission.name} squad did: intake, analysis, sourced research, plan, produce, review — and surfaced the trust + global-coherence questions. What stays human: the judgment, the two checkpoints, and the two gates._\n`;
   tick('certify', stageOwnerName(mission, 'certify'), String(cf.count), a10, wa('10-certification.md', a10));
   log(`[9/9] ${c.cyan('CERTIFY')}   ${c.dim(stageOwnerName(mission, 'certify'))}  → ${cf.summary}  ${shippable ? c.green(gateLine(signoffGate)) : c.gold(gateLine(signoffGate))}`);
+  log(`  ${cp2.status === 'open' ? c.gold('◆ TRUST') : c.green('◇ TRUST')}    ${c.dim('checkpoint')}  → ${checkpointLine(cp2)}`);
 
-  const totals = commit(memoryPath, { slug: intk.slug, requirement: requirementText, mission: mission.name, domain: intk.domain, jurisdictionName: intk.jurisdictionName, coveragePct: r.coverage, conflicts: r.conflicts, gates, shippable, meter });
+  const totals = commit(memoryPath, { slug: intk.slug, requirement: requirementText, mission: mission.name, domain: intk.domain, jurisdictionName: intk.jurisdictionName, coveragePct: r.coverage, conflicts: r.conflicts, gates, checkpoints, shippable, meter });
 
+  const oq = openQuestions(checkpoints);
   log('');
+  if (oq.length) {
+    log(c.gold('━━━ IN DELIBERATION — your judgment is required ━━━'));
+    oq.forEach((q, i) => log(c.gold(`  ${i + 1}. `) + c.dim('[' + q.node + '] ') + q.question));
+    log(c.dim('  Resolve with --resolve "frame: <answer>" / --resolve "trust: <answer>" (or via the MCP loop).'));
+    log('');
+  }
   log(c.gold('━━━ done ━━━'));
   log(`Squad:      ${mission.squad.map((s) => s.name).join(' · ')}`);
+  log(`Trust:      ${ta.trust.level} (${ta.trust.score}/100) · Substance: ${ta.substance.verdict}`);
   log(`Artifacts:  ${c.bold(outDir)}`);
   log(`Memory:     Ed_agents_Claude.md  (run #${mem.priorRuns + 1})`);
   log(`I/O (est):  ${c.bold(fmt(totals.totIn))} in / ${c.bold(fmt(totals.totOut))} out`);
-  log(`Verdict:    ${shippable ? c.green('SHIPPABLE') : c.gold('gates pending — not bypassed')}`);
+  log(`Verdict:    ${shippable ? c.green('SHIPPABLE') : c.gold(oq.length ? 'IN DELIBERATION — ' + oq.length + ' open question(s)' : 'gates pending — not bypassed')}`);
 
-  return { slug: intk.slug, outDir, mission: mission.id, missionName: mission.name, squad: mission.squad.map((s) => s.name), domain: intk.domain, jurisdiction: intk.jurisdiction, jurisdictionName: intk.jurisdictionName, concerns: ana.concerns, coveragePct: r.coverage, conflicts: r.conflicts, findings: r.findings, gates, shippable, meter, totals, wired: !!engine.wired, priorRuns: mem.priorRuns, prefsApplied: applied, prefsCount: pref.count };
+  return { slug: intk.slug, outDir, mission: mission.id, missionName: mission.name, squad: mission.squad.map((s) => s.name), domain: intk.domain, jurisdiction: intk.jurisdiction, jurisdictionName: intk.jurisdictionName, concerns: ana.concerns, coveragePct: r.coverage, conflicts: r.conflicts, findings: r.findings, gates, checkpoints, openQuestions: oq, inDeliberation: oq.length > 0, trust: ta.trust, substance: ta.substance, coherence: ta.coherence, intentStated: intent.stated, shippable, meter, totals, wired: !!engine.wired, priorRuns: mem.priorRuns, prefsApplied: applied, prefsCount: pref.count };
 }
 
 export { prefs };
