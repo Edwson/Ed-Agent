@@ -19,9 +19,14 @@ const TELLS_EN = [
 ];
 const TRANSITIONS_ZH = ['總之', '綜上所述', '首先', '其次', '再者', '此外', '另外', '值得一提的是', '值得注意的是', '眾所周知', '不言而喻', '在當今數位時代', '在當今數字時代', '在這個時代', '無庸置疑'];
 const TELLS_ZH = ['賦能', '抓手', '閉環', '顆粒度', '打法', '對齊', '心智', '生態', '護城河', '降本增效', '全方位', '一站式', '無縫', '極致', '頂級', '革命性', '顛覆'];
+// JA — per Convention 14 (EN primary · JA secondary · ZH last), the agent also catches
+// Japanese AI-tone filler. No word boundaries in Japanese, so matched by substring like ZH.
+const TRANSITIONS_JA = ['まず', '次に', '最後に', 'さらに', '加えて', 'つまり', '要するに', '結論として', '言うまでもなく', '周知のとおり', 'ご存知のとおり', '今日のデジタル時代において'];
+const TELLS_JA = ['シームレス', '革新的', '最先端', '世界クラス', '業界をリード', 'パラダイムシフト', '次世代', 'ワンストップ', 'とにかく', 'まさに', '圧倒的', '相乗効果', '抜本的'];
 
 const AI_TONE_EN = [...TRANSITIONS_EN, ...TELLS_EN];
 const AI_TONE_ZH = [...TRANSITIONS_ZH, ...TELLS_ZH];
+const AI_TONE_JA = [...TRANSITIONS_JA, ...TELLS_JA];
 
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -39,6 +44,11 @@ export function aiToneScan(text) {
     let n = 0, i = 0;
     while ((i = t.indexOf(p, i)) !== -1) { n++; i += p.length; }
     if (n) hits.push({ term: p, count: n, lang: 'zh' });
+  }
+  for (const p of AI_TONE_JA) {
+    let n = 0, i = 0;
+    while ((i = t.indexOf(p, i)) !== -1) { n++; i += p.length; }
+    if (n) hits.push({ term: p, count: n, lang: 'ja' });
   }
   return hits.sort((a, b) => b.count - a.count);
 }
@@ -123,6 +133,10 @@ export function humanTone(text) {
   }
   for (const p of TRANSITIONS_ZH) {
     const re = new RegExp(esc(p) + '[，,、：:]?\\s*', 'g');
+    t = t.replace(re, () => { removed++; return ''; });
+  }
+  for (const p of TRANSITIONS_JA) {
+    const re = new RegExp(esc(p) + '[、，,：:]?\\s*', 'g');
     t = t.replace(re, () => { removed++; return ''; });
   }
   return { text: t.replace(/[ \t]{2,}/g, ' ').trim(), removed };

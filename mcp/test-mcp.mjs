@@ -22,7 +22,7 @@ const transport = new StdioClientTransport({ command: 'node', args: [join(here, 
 await client.connect(transport);
 
 const tools = (await client.listTools()).tools.map((t) => t.name);
-ok(['ed_agent_missions', 'ed_agent_skills', 'ed_agent_run', 'ed_agent_optimize', 'ed_agent_quality_scan', 'ed_agent_deliberate', 'ed_agent_trust_scan', 'ed_agent_remember', 'ed_agent_recall'].every((t) => tools.includes(t)), '9 tools registered (got ' + tools.length + ')');
+ok(['ed_agent_missions', 'ed_agent_skills', 'ed_agent_run', 'ed_agent_optimize', 'ed_agent_quality_scan', 'ed_agent_deliberate', 'ed_agent_trust_scan', 'ed_agent_redteam', 'ed_agent_ground', 'ed_agent_remember', 'ed_agent_recall'].every((t) => tools.includes(t)), '11 tools registered (got ' + tools.length + ')');
 
 const missions = txt(await client.callTool({ name: 'ed_agent_missions', arguments: {} }));
 ok(/finance/.test(missions) && /code/.test(missions) && /marketing/.test(missions) && /contract/.test(missions) && /optimize/.test(missions), 'ed_agent_missions lists all five squads');
@@ -50,6 +50,16 @@ ok(/NOT YET SHIPPABLE/.test(opt), 'ed_agent_optimize leaves gates pending by def
 
 const qs = txt(await client.callTool({ name: 'ed_agent_quality_scan', arguments: { text: 'In conclusion, our world-class seamless platform will leverage synergy to improve things.' } }));
 ok(/REWORK|PASS/.test(qs) && /Overall:/.test(qs), 'ed_agent_quality_scan returns a blind score + verdict');
+
+const rteam = txt(await client.callTool({ name: 'ed_agent_redteam', arguments: { artifact: 'const apiKey = "sk-live-abcdef123456";\ntry { charge() } catch (e) {}\nOur world-class platform is the best.', mission: 'code' } }));
+ok(/Red team/.test(rteam) && /CRITICAL/.test(rteam) && /hardcoded secret/i.test(rteam), 'ed_agent_redteam flags the hardcoded secret (critical) on a code artifact');
+ok(/does NOT replace a human expert/i.test(rteam), 'ed_agent_redteam states its own coverage (honest by construction)');
+
+const grnd = txt(await client.callTool({ name: 'ed_agent_ground', arguments: { artifact: 'We will migrate the payments schema.\nValidate input per OWASP ASVS V5.', mission: 'code', intent: 'cut failed-payment churn', nonGoals: 'do not migrate the payments schema' } }));
+ok(/Contradicted/.test(grnd) && /Grounded/.test(grnd), 'ed_agent_ground tags Contradicted (non-goal) + Grounded (cited source) claims');
+
+const strictRun = txt(await client.callTool({ name: 'ed_agent_run', arguments: { requirement: 'Add a payment retry flow and migrate the payments schema', mission: 'code', intent: 'cut failed-payment churn', nonGoals: 'do not migrate the payments schema', approve: 'Ed', signoff: 'Ed', resolve: ['trust: ok'], strict: true } }));
+ok(/NOT YET SHIPPABLE/.test(strictRun) && /IN DELIBERATION/.test(strictRun), 'ed_agent_run --strict gates the verdict on a contradicted non-goal (not bypassed)');
 
 await client.callTool({ name: 'ed_agent_remember', arguments: { kind: 'prefer', text: 'tone: terse' } });
 const recall = txt(await client.callTool({ name: 'ed_agent_recall', arguments: {} }));

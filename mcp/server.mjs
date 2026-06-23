@@ -7,9 +7,11 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { run, prefs } from '../src/orchestrator.mjs';
-import { MISSIONS } from '../src/missions/index.mjs';
+import { MISSIONS, missionById } from '../src/missions/index.mjs';
 import { aiToneScan, blindScore, quantifyGaps, verdict } from '../src/skills/quality.mjs';
-import { trustScore, substanceScan } from '../src/skills/trust.mjs';
+import { trustScore, substanceScan, captureIntent } from '../src/skills/trust.mjs';
+import { redTeamScan, redTeamBlock } from '../src/skills/redteam.mjs';
+import { groundClaims, groundingBlock } from '../src/skills/grounding.mjs';
 import { auditArtifact } from '../src/deliberate.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -46,11 +48,11 @@ export function buildServer() {
     {
       title: 'Run Ed Agent on a requirement',
       description: 'Drive one plain-English requirement through the nine-stage lifecycle with the auto-detected (or forced) squad. Returns the certification, the research brief, the deliberation checkpoints, and the artifact list. The run stops at two deliberation checkpoints (FRAME, TRUST) and stays IN DELIBERATION until you answer the open questions — supply intent/done/nonGoals up front and resolve[] to clear them. Human gates stay pending unless approve/signoff names are supplied. The host loop: run → read the open questions → discuss with the human → run again with the answers in resolve[].',
-      inputSchema: { requirement: z.string().describe('the plain-English requirement'), mission: z.enum(['finance', 'code', 'marketing', 'contract', 'optimize']).optional(), jurisdiction: z.string().optional(), intent: z.string().optional().describe('the business goal (the outcome, not the task) — clears the FRAME checkpoint'), done: z.string().optional().describe('what "done" means in business terms'), nonGoals: z.string().optional().describe('out of scope, ;-separated'), resolve: z.array(z.string()).optional().describe('answers to open checkpoints, each "frame: ..." or "trust: ..."'), approve: z.string().optional().describe('name that clears the plan/design gate'), signoff: z.string().optional().describe('name that clears the certification gate') },
+      inputSchema: { requirement: z.string().describe('the plain-English requirement'), mission: z.enum(['finance', 'code', 'marketing', 'contract', 'optimize']).optional(), jurisdiction: z.string().optional(), intent: z.string().optional().describe('the business goal (the outcome, not the task) — clears the FRAME checkpoint'), done: z.string().optional().describe('what "done" means in business terms'), nonGoals: z.string().optional().describe('out of scope, ;-separated'), resolve: z.array(z.string()).optional().describe('answers to open checkpoints, each "frame: ..." / "trust: ..." / "redteam: ..."'), approve: z.string().optional().describe('name that clears the plan/design gate'), signoff: z.string().optional().describe('name that clears the certification gate'), strict: z.boolean().optional().describe('gate the verdict on red-team critical findings + contradicted claims (default: report-only)') },
     },
     async (args) => {
       const out = mkdtempSync(join(tmpdir(), 'ed-agent-'));
-      const r = await run(args.requirement, { mission: args.mission, jurisdiction: args.jurisdiction, intent: args.intent, done: args.done, nonGoals: args.nonGoals, resolve: args.resolve, approve: args.approve, signoff: args.signoff, outDir: out, memoryPath, quiet: true });
+      const r = await run(args.requirement, { mission: args.mission, jurisdiction: args.jurisdiction, intent: args.intent, done: args.done, nonGoals: args.nonGoals, resolve: args.resolve, approve: args.approve, signoff: args.signoff, strict: args.strict, outDir: out, memoryPath, quiet: true });
       const files = readdirSync(out, { recursive: true }).filter((f) => typeof f === 'string').sort();
       const delib = r.checkpoints.map((cp) => cp.status === 'open' ? `◆ ${cp.name} (${cp.questions.length}Q)` : `✓ ${cp.name}`).join(' · ');
       const qs = r.openQuestions.length ? `\n\nIN DELIBERATION — answer these with the human, then run again with resolve[]:\n${r.openQuestions.map((q, i) => `  ${i + 1}. [${q.node}] ${q.question}`).join('\n')}` : '';
@@ -104,6 +106,30 @@ export function buildServer() {
       const t = trustScore({ text: args.text }), s = substanceScan(args.text);
       const md = `# Trust scan\n\n**Trust: ${t.level} (${t.score}/100)**\n${t.factors.map((f) => `- ${f.state === 'ok' ? '✓' : f.state === 'risk' ? '✗' : '·'} ${f.name}: ${f.note}`).join('\n')}\n${t.raise.length ? `\n_To raise:_ ${t.raise.slice(0, 4).join(' · ')}\n` : ''}\n**Substance: ${s.verdict} (${s.substanceScore}/100)**\n${s.flags.length ? s.flags.map((f) => `- ⚠ ${f}`).join('\n') : '- no ceremony flags'}\n`;
       return text(md);
+    });
+
+  server.registerTool('ed_agent_redteam',
+    {
+      title: 'Red team — mission-aware adversarial scan, no lifecycle',
+      description: 'Point the red team at any artifact (code, copy, a clause, a regulated surface) and get the adversarial findings: the universal checks (unquantified claims, AI-tone filler, over-defensive ceremony, and — when you supply intent/nonGoals — anything that does what a non-goal forbids) PLUS the domain catalog for the chosen mission (code: injection / empty-catch / hardcoded secrets; marketing: unsourced superlatives / missing disclaimer; contract: ambiguous quantifiers / one-sided clauses; finance: a regulated claim with no anchor). Deterministic, zero-LLM. It states its own coverage and never claims to replace a human expert.',
+      inputSchema: { artifact: z.string().describe('the code / copy / clause / surface to attack'), mission: z.enum(['finance', 'code', 'marketing', 'contract', 'optimize']).optional(), intent: z.string().optional().describe('the business goal — enables the non-goal contradiction check'), nonGoals: z.string().optional().describe('out of scope, ;-separated') },
+    },
+    async (args) => {
+      const intent = captureIntent(args.artifact, { intent: args.intent, nonGoals: args.nonGoals });
+      const r = redTeamScan(args.artifact, { mission: args.mission ? missionById(args.mission) : {}, intent });
+      return text(redTeamBlock(r));
+    });
+
+  server.registerTool('ed_agent_ground',
+    {
+      title: 'Claim grounding — three states, no lifecycle',
+      description: 'Tag every load-bearing claim / decision in an artifact as Grounded (it traces to a cited source or the stated goal), Ungrounded (confident, with nothing behind it), or Contradicted (it does what a non-goal forbids). Works for any business: the universal source is the captured intent, so supply intent/nonGoals to make it sharp; the chosen mission adds what else counts as a source (code: spec/ticket/test; marketing: a number/data source; contract: a clause; finance: a regulation anchor). Deterministic, zero-LLM.',
+      inputSchema: { artifact: z.string().describe('the artifact whose claims to ground'), mission: z.enum(['finance', 'code', 'marketing', 'contract', 'optimize']).optional(), intent: z.string().optional().describe('the business goal — the universal grounding source'), nonGoals: z.string().optional().describe('out of scope, ;-separated') },
+    },
+    async (args) => {
+      const intent = captureIntent(args.artifact, { intent: args.intent, nonGoals: args.nonGoals });
+      const r = groundClaims(args.artifact, { mission: args.mission ? missionById(args.mission) : {}, intent });
+      return text(groundingBlock(r));
     });
 
   server.registerTool('ed_agent_remember',

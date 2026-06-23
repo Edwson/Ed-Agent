@@ -16,6 +16,8 @@ import { loadEngine } from './edsBridge.mjs';
 import { captureIntent } from './skills/trust.mjs';
 import { frameAssessment, trustAssessment } from './deliberate.mjs';
 import { checkpoint as makeCheckpoint, allCheckpointsCleared, openCheckpoints, openQuestions, checkpointLine, parseResolutions } from './checkpoints.mjs';
+import { redTeamScan, redTeamQuestions, redTeamBlock } from './skills/redteam.mjs';
+import { groundClaims, groundingQuestions, groundingBlock } from './skills/grounding.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..');
@@ -110,6 +112,15 @@ export async function run(requirement, opts = {}) {
   tick('qa', stageOwnerName(mission, 'review'), brief.requirement, rv.text, rv.out);
   log(`[8/9] ${c.cyan('REVIEW')}    ${c.dim(stageOwnerName(mission, 'review'))}  → ${rv.summary}`);
 
+  // 8b RED TEAM + CLAIM GROUNDING (v0.5) — additive, report-only by default. Both are pure
+  // deterministic passes (~0 token). They write a report artifact and never change the
+  // shippable verdict unless --strict is set (then critical/contradicted feed a checkpoint).
+  const rtArtifact = ctx._produced || pr.text || requirementText;
+  const rt = redTeamScan(rtArtifact, { mission, intent });
+  const gr = groundClaims(rtArtifact, { mission, intent });
+  wa('08b-redteam-grounding.md', `# 08b · Red team + claim grounding\n\n_${o.strict ? 'STRICT — critical findings + contradicted claims must be resolved at the red-team checkpoint.' : 'Report-only (default) — surfaced for your judgment; does not change the verdict. Run with --strict to gate on critical findings.'}_\n` + redTeamBlock(rt) + groundingBlock(gr));
+  log(`  ${rt.counts.critical ? c.gold('◆ REDTEAM') : c.green('◇ REDTEAM')}  ${c.dim(stageOwnerName(mission, 'review'))}  → ${rt.findings.length} finding(s) · ${rt.counts.critical} critical · grounding ${gr.counts.grounded}G/${gr.counts.ungrounded}U/${gr.counts.contradicted}C${o.strict ? c.gold(' · strict') : c.dim(' · report-only')}`);
+
   // 9 CERTIFY → SIGN-OFF gate
   const cf = mission.certify(brief, ctx);
   const signoffGate = gate('Certification sign-off', stageOwnerName(mission, 'certify') + ' → human', o.signoff);
@@ -126,7 +137,19 @@ export async function run(requirement, opts = {}) {
   const cp2 = makeCheckpoint('trust', 'Trust & global coherence', 'after-review', { questions: ta.questions, assessment: ta.md, resolution: resolutions.trust });
   wa('c2-trust-checkpoint.md', ta.md + (cp2.questions.length ? `\n## Open questions\n${cp2.questions.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n` : '\n_Cleared — no open question._\n'));
 
-  const checkpoints = [cp1, cp2];
+  // CP3 · RED TEAM (only under --strict) — critical findings + contradicted claims become
+  // the questions a human must consciously accept. In the default report-only mode this
+  // checkpoint is not created, so the checkpoints array (and the verdict) stay byte-stable.
+  const cp3 = o.strict
+    ? makeCheckpoint('redteam', 'Red team & grounding (strict)', 'after-review', {
+        questions: [...redTeamQuestions(rt), ...groundingQuestions(gr)],
+        assessment: redTeamBlock(rt) + groundingBlock(gr),
+        resolution: resolutions.redteam,
+      })
+    : null;
+  if (cp3) wa('c3-redteam-checkpoint.md', cp3.assessment + (cp3.questions.length ? `\n## Open questions\n${cp3.questions.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n` : '\n_Cleared — no critical finding / contradiction._\n'));
+
+  const checkpoints = cp3 ? [cp1, cp2, cp3] : [cp1, cp2];
   const shippable = allCleared(gates) && allCheckpointsCleared(checkpoints);
   const a10 = `# 10 · Certification\n\n- Mission: **${mission.name}**\n- Conformance / checklist: ${cf.summary}\n- Trust: **${ta.trust.level}** (${ta.trust.score}/100) · Substance: **${ta.substance.verdict}** (${ta.substance.substanceScore}/100)\n- Review issues: ${rv.issues || 0}\n- Research coverage: ${r.coverage}%\n\n## Gates\n${gates.map((g) => '- ' + gateLine(g)).join('\n')}\n\n## Deliberation checkpoints\n${checkpoints.map((cp) => '- ' + checkpointLine(cp)).join('\n')}\n\n## Verdict\n**${shippable ? 'SHIPPABLE — gates cleared, deliberation closed.' : 'NOT YET SHIPPABLE — ' + (openCheckpoints(checkpoints).length ? openCheckpoints(checkpoints).length + ' open checkpoint(s) need your judgment; ' : '') + 'gate(s)/checkpoint(s) pending. The harness does not bypass them.'}**\n\n_What the ${mission.name} squad did: intake, analysis, sourced research, plan, produce, review — and surfaced the trust + global-coherence questions. What stays human: the judgment, the two checkpoints, and the two gates._\n`;
   tick('certify', stageOwnerName(mission, 'certify'), String(cf.count), a10, wa('10-certification.md', a10));
@@ -151,7 +174,7 @@ export async function run(requirement, opts = {}) {
   log(`I/O (est):  ${c.bold(fmt(totals.totIn))} in / ${c.bold(fmt(totals.totOut))} out`);
   log(`Verdict:    ${shippable ? c.green('SHIPPABLE') : c.gold(oq.length ? 'IN DELIBERATION — ' + oq.length + ' open question(s)' : 'gates pending — not bypassed')}`);
 
-  return { slug: intk.slug, outDir, mission: mission.id, missionName: mission.name, squad: mission.squad.map((s) => s.name), domain: intk.domain, jurisdiction: intk.jurisdiction, jurisdictionName: intk.jurisdictionName, concerns: ana.concerns, coveragePct: r.coverage, conflicts: r.conflicts, findings: r.findings, gates, checkpoints, openQuestions: oq, inDeliberation: oq.length > 0, trust: ta.trust, substance: ta.substance, coherence: ta.coherence, intentStated: intent.stated, shippable, meter, totals, wired: !!engine.wired, priorRuns: mem.priorRuns, prefsApplied: applied, prefsCount: pref.count };
+  return { slug: intk.slug, outDir, mission: mission.id, missionName: mission.name, squad: mission.squad.map((s) => s.name), domain: intk.domain, jurisdiction: intk.jurisdiction, jurisdictionName: intk.jurisdictionName, concerns: ana.concerns, coveragePct: r.coverage, conflicts: r.conflicts, findings: r.findings, gates, checkpoints, openQuestions: oq, inDeliberation: oq.length > 0, trust: ta.trust, substance: ta.substance, coherence: ta.coherence, intentStated: intent.stated, redteam: { counts: rt.counts, findings: rt.findings.length, block: rt.block }, grounding: gr.counts, strict: !!o.strict, shippable, meter, totals, wired: !!engine.wired, priorRuns: mem.priorRuns, prefsApplied: applied, prefsCount: pref.count };
 }
 
 export { prefs };

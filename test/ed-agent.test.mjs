@@ -5,6 +5,8 @@ import { run, prefs } from '../src/orchestrator.mjs';
 import { detectMission } from '../src/missions/index.mjs';
 import { aiToneScan, blindScore, verdict } from '../src/skills/quality.mjs';
 import { captureIntent } from '../src/skills/trust.mjs';
+import { redTeamScan, redTeamQuestions } from '../src/skills/redteam.mjs';
+import { groundClaims } from '../src/skills/grounding.mjs';
 import { auditArtifact } from '../src/deliberate.mjs';
 import { existsSync, readFileSync, rmSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -92,6 +94,38 @@ ok((memTxt.match(/^## Run \d{4}-/gm) || []).length === 7, 'seven run entries app
 ok(/\*\*Mission:\*\*/.test(memTxt), 'run entries record the mission');
 ok(/## Preferences/.test(memTxt), 'preferences section present');
 
+console.log('\nred team — mission-aware adversarial pass (pure, ~0 token)');
+const rtCode = redTeamScan('const apiKey = "sk-live-abc123def456";\ntry { charge() } catch (e) {}', { mission: { id: 'code' } });
+ok(rtCode.counts.critical >= 1 && rtCode.findings.some((f) => f.id === 'hardcoded-secret'), 'code: hardcoded secret → critical');
+ok(rtCode.findings.some((f) => f.id === 'empty-catch'), 'code: empty catch → high');
+const rtMkt = redTeamScan('Our world-class platform delivers 50% better outcomes.', { mission: { id: 'marketing' } });
+ok(rtMkt.findings.some((f) => f.id === 'superlative-no-source') && rtMkt.findings.some((f) => f.id === 'fabricated-stat-shape'), 'marketing: unsourced superlative + naked stat flagged');
+const rtCon = redTeamScan('The vendor must use reasonable efforts and may at its sole discretion terminate; indemnify against all claims.', { mission: { id: 'contract' } });
+ok(rtCon.findings.some((f) => f.id === 'ambiguous-quantifier') && rtCon.findings.some((f) => f.id === 'unilateral-right') && rtCon.findings.some((f) => f.id === 'missing-carveout'), 'contract: ambiguous quantifier + one-sided right + missing carve-out');
+const rtFin = redTeamScan('The KYC step collects source of funds for EDD verification.', { mission: { id: 'finance' } });
+ok(rtFin.findings.some((f) => f.id === 'regulated-claim-no-anchor'), 'finance: regulated claim with no anchor flagged');
+ok([rtCode, rtMkt, rtCon, rtFin].every((r) => /does NOT replace a human expert/i.test(r.coverage)), 'every report states its own coverage (honest — passes its own test)');
+const intentNG = captureIntent('x', { intent: 'cut failed-payment churn', nonGoals: 'do not migrate the payments schema' });
+const rtUni = redTeamScan('Add a retry flow.\nMigrate the payments schema for speed.', { mission: { id: 'universal' }, intent: intentNG });
+ok(rtUni.counts.critical >= 1 && redTeamQuestions(rtUni).length >= 1, 'universal: a non-goal contradiction is a critical finding + a human question');
+
+console.log('\nclaim grounding — three states + universal fallback (no domain pack)');
+const gr = groundClaims('We will migrate the payments schema.\nValidate input per OWASP ASVS V5.\nWe should add a generic helper.', { intent: intentNG });
+ok(gr.counts.contradicted >= 1, 'Contradicted: violates a stated non-goal');
+ok(gr.counts.grounded >= 1, 'Grounded: traces to a cited source (per OWASP …)');
+ok(gr.counts.ungrounded >= 1, 'Ungrounded: a confident decision with nothing behind it');
+ok(gr.mission === 'universal', 'grounding runs with zero domain pack (universal source = intent)');
+
+console.log('\n--strict — report-only by default, opt-in gate (verdict byte-stable when off)');
+const smem = join(tmp, 'strict-mem.md');
+const rOpts = { mission: 'code', intent: 'cut failed-payment churn', nonGoals: 'do not migrate the payments schema', approve: 'Ed', signoff: 'Ed', resolve: ['trust: ok'], quiet: true };
+const repOnly = await run('Add a payment retry flow and migrate the payments schema', { ...rOpts, outDir: join(tmp, 'rep'), memoryPath: smem });
+ok(repOnly.checkpoints.map((c) => c.id).join(',') === 'frame,trust' && repOnly.shippable === true && repOnly.redteam.counts.critical >= 1, 'default: critical surfaced but NOT blocking — checkpoints + verdict byte-stable');
+const strictBlocked = await run('Add a payment retry flow and migrate the payments schema', { ...rOpts, strict: true, outDir: join(tmp, 'st'), memoryPath: smem });
+ok(strictBlocked.checkpoints.some((c) => c.id === 'redteam' && c.status === 'open') && strictBlocked.shippable === false, '--strict: the contradiction opens a red-team checkpoint → not shippable (not bypassed)');
+const strictResolved = await run('Add a payment retry flow and migrate the payments schema', { ...rOpts, strict: true, resolve: ['trust: ok', 'redteam: accepted — conscious trade-off'], outDir: join(tmp, 'sr'), memoryPath: smem });
+ok(strictResolved.shippable === true, '--strict + --resolve "redteam: …": the human consciously accepts → shippable (proposes, never disposes)');
+
 rmSync(tmp, { recursive: true, force: true });
-console.log(fails === 0 ? '\nPASS — squads swap, skills produce, memory learns, gates hold.' : `\nFAIL — ${fails} check(s) failed.`);
+console.log(fails === 0 ? '\nPASS — squads swap, skills produce, memory learns, gates hold, red team + grounding run report-only.' : `\nFAIL — ${fails} check(s) failed.`);
 process.exit(fails === 0 ? 0 : 1);
