@@ -16,7 +16,7 @@ const root = join(here, '..');
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const memoryPath = join(root, 'Ed_agents_Claude.md');
 
-const VALUE_FLAGS = ['--jurisdiction', '--mission', '--approve', '--signoff', '--eds', '--out', '--input', '--intent', '--done', '--not', '--audit', '--refine', '--loop-max', '--target', '--remember', '--prefer', '--like', '--dislike'];
+const VALUE_FLAGS = ['--jurisdiction', '--mission', '--approve', '--signoff', '--eds', '--out', '--input', '--intent', '--done', '--not', '--audit', '--refine', '--loop-max', '--target', '--port', '--mem', '--remember', '--prefer', '--like', '--dislike'];
 const REPEATABLE = ['--resolve', '--reject'];
 const argv = process.argv.slice(2);
 const flags = {}; const words = [];
@@ -34,12 +34,20 @@ if (flags['--input']) {
   catch (e) { console.error('ed-agent: cannot read --input file:', e && e.message ? e.message : e); process.exit(1); }
 }
 
+// `ed-agent dashboard` — open the local control room (a zero-dependency node:http server,
+// 127.0.0.1 only, reading + tuning the same memory file). Does not run a requirement.
+if (words[0] === 'dashboard') {
+  const { start } = await import('../dashboard/server.mjs');
+  start({ port: flags['--port'], memPath: flags['--mem'] || memoryPath, open: !!flags['--open'] });
+}
+
 if (flags['--help'] || flags['-h']) {
   console.log(`ed-agent v${pkg.version} — one requirement → a mission-swapped, human-gated lifecycle
 
 USAGE
   ed-agent "<requirement>" [options]
   ed-agent --remember "<idea>"            # teach it, without running
+  ed-agent dashboard [--port N] [--mem <path>] [--open]   # open the local control room (127.0.0.1 only)
 
 MISSIONS (auto-detected, or force with --mission)
   finance    regulated-finance design — drives the eds-mcp build engine
@@ -167,11 +175,13 @@ if (record.length && !requirement) {
   process.exit(0);
 }
 
-run(requirement, {
-  mission: flags['--mission'], jurisdiction: flags['--jurisdiction'],
-  approve: flags['--approve'], signoff: flags['--signoff'],
-  intent: flags['--intent'], done: flags['--done'], nonGoals: flags['--not'], resolve: flags['--resolve'],
-  strict: !!flags['--strict'],
-  loop: !!flags['--loop'], loopMax: flags['--loop-max'], target: flags['--target'], reject: flags['--reject'],
-  edsPath: flags['--eds'], outDir: flags['--out'], quiet: !!flags['--quiet'], record,
-}).then(() => process.exit(0)).catch((e) => { console.error('ed-agent error:', e && e.message ? e.message : e); process.exit(1); });
+if (words[0] !== 'dashboard') {
+  run(requirement, {
+    mission: flags['--mission'], jurisdiction: flags['--jurisdiction'],
+    approve: flags['--approve'], signoff: flags['--signoff'],
+    intent: flags['--intent'], done: flags['--done'], nonGoals: flags['--not'], resolve: flags['--resolve'],
+    strict: !!flags['--strict'],
+    loop: !!flags['--loop'], loopMax: flags['--loop-max'], target: flags['--target'], reject: flags['--reject'],
+    edsPath: flags['--eds'], outDir: flags['--out'], quiet: !!flags['--quiet'], record,
+  }).then(() => process.exit(0)).catch((e) => { console.error('ed-agent error:', e && e.message ? e.message : e); process.exit(1); });
+}

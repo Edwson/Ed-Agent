@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ed Agent · control room</title>
+<meta name="robots" content="noindex">
+<style>
+  /* System fonts only — this page makes ZERO external requests. Nothing about your runs leaves the machine. */
+  :root{
+    --bg:#0b0b0e; --bg2:#0f0f13; --panel:#131318; --panel2:#17171d; --raised:#1c1c23;
+    --line:rgba(255,255,255,.06); --line2:rgba(255,255,255,.11);
+    --ink:#f3f2ef; --dim:#a9a8a6; --faint:#6d6d72;
+    --gold:#cdae74; --gold-dim:#b59a66; --gold-soft:rgba(205,174,116,.10); --gold-line:rgba(205,174,116,.26);
+    --green:#79bf9c; --amber:#d4ac61; --red:#cf8d83;
+    --mono:ui-monospace,SFMono-Regular,Menlo,"Cascadia Mono",Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --serif:Georgia,"Times New Roman",serif;
+    --rad:16px; --mx:clamp(16px,4vw,52px);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.6;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(1200px 640px at 78% -14%,rgba(205,174,116,.05),transparent 60%)}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 var(--mx)}
+  .mono{font-family:var(--mono)}
+  .muted{color:var(--faint)}
+  h1,h2,h3,h4{margin:0;font-weight:600}
+  .eyebrow{font-size:.66rem;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--gold-dim)}
+
+  /* top bar */
+  .bar{position:sticky;top:0;z-index:20;background:rgba(11,11,14,.82);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+  .bar__in{display:flex;align-items:center;gap:16px;height:62px}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--serif);font-size:1.12rem}
+  .brand b{font-weight:600}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 9px rgba(121,191,156,.7);flex:none}
+  .bar__live{font-family:var(--mono);font-size:.7rem;color:var(--faint);display:flex;align-items:center;gap:7px}
+  .bar__spacer{flex:1}
+  .btn{font-family:var(--mono);font-size:.78rem;color:var(--dim);border:1px solid var(--line2);border-radius:9px;padding:7px 13px;background:var(--panel);cursor:pointer;transition:border-color .2s,color .2s,background .2s}
+  .btn:hover{border-color:var(--gold-line);color:var(--gold);background:var(--gold-soft)}
+  .btn--gold{background:var(--gold);color:#1a1407;border-color:var(--gold);font-weight:600}
+  .btn--gold:hover{background:#dcbd84;color:#1a1407}
+
+  main{padding:30px 0 80px}
+  .lead{margin:6px 0 26px}
+  .lead h1{font-family:var(--serif);font-size:clamp(1.5rem,3.4vw,2.1rem);line-height:1.15}
+  .lead p{margin:8px 0 0;color:var(--dim);max-width:760px}
+
+  /* overview cards */
+  .cards{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px}
+  @media(max-width:880px){.cards{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:460px){.cards{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--rad);padding:16px 17px}
+  .card b{font-family:var(--serif);font-size:1.85rem;line-height:1;display:block;font-variant-numeric:tabular-nums}
+  .card span{font-family:var(--mono);font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);display:block;margin-top:7px}
+  .card small{font-size:.72rem;color:var(--dim);display:block;margin-top:3px}
+
+  .grid2{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;margin-top:16px}
+  @media(max-width:920px){.grid2{grid-template-columns:1fr}}
+  .pane{background:var(--panel);border:1px solid var(--line);border-radius:var(--rad);padding:20px}
+  .pane__h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:14px}
+  .pane__h h2{font-family:var(--serif);font-size:1.18rem}
+  .pane__note{font-size:.78rem;color:var(--faint);line-height:1.5;margin-top:12px}
+
+  /* token panel */
+  .tok-big{display:flex;gap:26px;flex-wrap:wrap;margin-bottom:14px}
+  .tok-big div b{font-family:var(--serif);font-size:1.7rem;font-variant-numeric:tabular-nums}
+  .tok-big div span{font-family:var(--mono);font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);display:block;margin-top:3px}
+  .mrow{display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center;margin:9px 0}
+  .mrow__k{font-size:.82rem;color:var(--dim);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mrow__v{font-family:var(--mono);font-size:.74rem;color:var(--faint);white-space:nowrap}
+  .mbar{grid-column:1/-1;height:7px;border-radius:99px;background:var(--bg2);overflow:hidden}
+  .mbar i{display:block;height:100%;border-radius:99px;background:var(--gold-dim)}
+
+  /* runs */
+  .runs{display:flex;flex-direction:column;gap:9px}
+  .run{border:1px solid var(--line);border-radius:12px;background:var(--panel2);overflow:hidden;transition:border-color .2s}
+  .run:hover{border-color:var(--line2)}
+  .run__top{display:grid;grid-template-columns:auto 1fr auto auto;gap:12px;align-items:center;padding:12px 15px;cursor:pointer}
+  .mtag{font-family:var(--mono);font-size:.62rem;letter-spacing:.05em;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold-line);border-radius:99px;padding:3px 9px;white-space:nowrap}
+  .run__req{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.92rem}
+  .run__req .d{font-family:var(--mono);font-size:.68rem;color:var(--faint)}
+  .pill{font-family:var(--mono);font-size:.64rem;padding:3px 9px;border-radius:99px;white-space:nowrap;border:1px solid var(--line2)}
+  .pill--ship{color:var(--green);border-color:rgba(121,191,156,.4);background:rgba(121,191,156,.08)}
+  .pill--delib{color:var(--amber);border-color:rgba(212,172,97,.4);background:rgba(212,172,97,.08)}
+  .pill--pending{color:var(--faint)}
+  .run__io{font-family:var(--mono);font-size:.7rem;color:var(--faint);white-space:nowrap;text-align:right}
+  .run__detail{border-top:1px solid var(--line);padding:15px;display:none;background:var(--panel)}
+  .run.open .run__detail{display:block}
+  .chev{color:var(--faint);font-size:.8rem;transition:transform .25s}
+  .run.open .chev{transform:rotate(90deg)}
+  .stab{width:100%;border-collapse:collapse;margin-top:4px;font-size:.8rem}
+  .stab td{padding:5px 8px;border-bottom:1px solid var(--line)}
+  .stab td:first-child{font-family:var(--mono);font-size:.72rem;color:var(--gold-dim);white-space:nowrap}
+  .stab td:nth-child(2){color:var(--dim)}
+  .stab td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;color:var(--faint);white-space:nowrap}
+  .stab .obar{height:5px;border-radius:99px;background:var(--bg2);overflow:hidden;min-width:60px}
+  .stab .obar i{display:block;height:100%;background:var(--gold-line)}
+  .meta{display:flex;flex-wrap:wrap;gap:7px;margin:11px 0 2px}
+  .chip{font-family:var(--mono);font-size:.66rem;padding:4px 10px;border-radius:99px;border:1px solid var(--line2);color:var(--dim)}
+  .chip.ok{color:var(--green);border-color:rgba(121,191,156,.35)}
+  .chip.wait{color:var(--amber);border-color:rgba(212,172,97,.35)}
+  .chip.open{color:var(--red);border-color:rgba(207,141,131,.4)}
+
+  /* settings */
+  .field{margin-bottom:14px}
+  .field label{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+  .field select,.field input[type=text],.field input[type=number]{width:100%;background:var(--bg2);border:1px solid var(--line2);color:var(--ink);border-radius:9px;padding:9px 11px;font-family:var(--mono);font-size:.82rem}
+  .field select:focus,.field input:focus{outline:none;border-color:var(--gold-line)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .tog{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;padding:7px 0}
+  .tog input{position:absolute;opacity:0;width:0;height:0}
+  .tog__sw{width:40px;height:22px;border-radius:99px;background:var(--bg2);border:1px solid var(--line2);position:relative;transition:background .2s,border-color .2s;flex:none}
+  .tog__sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--faint);transition:transform .2s,background .2s}
+  .tog input:checked+.tog__sw{background:var(--gold-soft);border-color:var(--gold-line)}
+  .tog input:checked+.tog__sw::after{transform:translateX(18px);background:var(--gold)}
+  .tog__t{font-size:.86rem;color:var(--dim)}
+  .tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:7px}
+  .tag{font-family:var(--mono);font-size:.7rem;padding:4px 8px 4px 11px;border-radius:99px;border:1px solid var(--line2);color:var(--dim);display:inline-flex;align-items:center;gap:7px}
+  .tag button{background:none;border:none;color:var(--faint);cursor:pointer;font-size:.9rem;line-height:1;padding:0}
+  .tag button:hover{color:var(--red)}
+  .save-row{display:flex;align-items:center;gap:12px;margin-top:6px}
+  .saved{font-family:var(--mono);font-size:.72rem;color:var(--green);opacity:0;transition:opacity .2s}
+  .saved.on{opacity:1}
+
+  /* learned rules */
+  .lr{border:1px solid var(--line);border-radius:11px;background:var(--panel2);padding:11px 13px;margin-bottom:8px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start}
+  .lr__id{font-family:var(--mono);font-size:.72rem;color:var(--gold)}
+  .lr__sev{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;padding:2px 7px;border-radius:99px;border:1px solid var(--line2);margin-left:7px}
+  .lr__msg{font-size:.84rem;color:var(--dim);margin-top:4px}
+  .lr__trig{font-family:var(--mono);font-size:.7rem;color:var(--faint);margin-top:3px}
+  .x{background:none;border:1px solid var(--line2);color:var(--faint);border-radius:8px;cursor:pointer;padding:4px 9px;font-size:.74rem;font-family:var(--mono)}
+  .x:hover{border-color:rgba(207,141,131,.5);color:var(--red)}
+
+  .empty{text-align:center;color:var(--faint);padding:26px 12px;font-size:.9rem}
+  .empty code{font-family:var(--mono);color:var(--gold-dim);background:var(--bg2);padding:2px 7px;border-radius:6px}
+
+  /* honest footer */
+  .honest{margin-top:22px;border:1px solid var(--line);border-radius:var(--rad);background:var(--panel);padding:22px}
+  .honest h3{font-family:var(--serif);font-size:1.1rem;margin-bottom:12px}
+  .honest__grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:760px){.honest__grid{grid-template-columns:1fr}.runs__top{grid-template-columns:auto 1fr auto}}
+  .honest ul{margin:0;padding-left:18px}
+  .honest li{font-size:.86rem;color:var(--dim);margin:6px 0;line-height:1.5}
+  .honest li b{color:var(--ink)}
+  .foot-note{margin-top:18px;font-size:.8rem;color:var(--faint);text-align:center}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+  <div class="bar">
+    <div class="wrap bar__in">
+      <div class="brand"><span class="dot"></span><b>ed-agent</b><span class="muted" style="font-family:var(--mono);font-size:.8rem">· control room</span></div>
+      <div class="bar__spacer"></div>
+      <div class="bar__live"><span id="livedot" style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block"></span><span id="livetxt">reading memory…</span></div>
+      <button class="btn" id="refresh" type="button">Refresh ↻</button>
+    </div>
+  </div>
+
+  <main class="wrap">
+    <div class="lead">
+      <span class="eyebrow">Local · reflects real runs · nothing leaves this machine</span>
+      <h1>What Ed&nbsp;Agent is actually doing.</h1>
+      <p>A control room over your real runs — read straight from the same <span class="mono">Ed_agents_Claude.md</span> the CLI writes. See every governed run, what it cost (estimated), what it learned, and tune how it behaves — without touching the command line.</p>
+    </div>
+
+    <div class="cards" id="cards"></div>
+
+    <div class="grid2">
+      <div class="pane">
+        <div class="pane__h"><h2>Runs</h2><span class="muted mono" id="runcount" style="font-size:.72rem"></span></div>
+        <div class="runs" id="runs"></div>
+      </div>
+
+      <div>
+        <div class="pane">
+          <div class="pane__h"><h2>Token cost</h2><span class="muted mono" style="font-size:.66rem">estimated</span></div>
+          <div class="tok-big" id="tokbig"></div>
+          <div id="tokmissions"></div>
+          <p class="pane__note" id="toknote"></p>
+        </div>
+
+        <div class="pane" style="margin-top:16px">
+          <div class="pane__h"><h2>How it’s used</h2><span class="muted mono" style="font-size:.62rem">writes your Preferences</span></div>
+          <div id="settings"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="pane">
+        <div class="pane__h"><h2>What it has learned</h2><span class="muted mono" id="rulecount" style="font-size:.72rem"></span></div>
+        <div id="rules"></div>
+      </div>
+      <div class="pane">
+        <div class="pane__h"><h2>Operator memory</h2><span class="muted mono" style="font-size:.62rem">read-only</span></div>
+        <div id="context"></div>
+      </div>
+    </div>
+
+    <div class="honest">
+      <h3>What this is — and what it isn’t</h3>
+      <div class="honest__grid">
+        <ul>
+          <li><b>It is</b> a window onto real runs that already happened — parsed from the human-readable memory file, the single source of truth.</li>
+          <li><b>It edits</b> the same file by hand-editable lines, so power users can still use git and a text editor.</li>
+          <li><b>It runs</b> on 127.0.0.1 only and makes <b>zero external requests</b> — your runs never leave the machine.</li>
+        </ul>
+        <ul>
+          <li><b>It is not</b> a live always-on daemon — Ed Agent runs are discrete, so this is a control room, not a real-time monitor.</li>
+          <li><b>Token figures are estimates</b> (~4 chars/token) for cost governance — <b>not a bill</b>.</li>
+          <li><b>The engine is the CLI / MCP.</b> This is a companion surface; it observes and tunes, it doesn’t replace them.</li>
+        </ul>
+      </div>
+      <p class="foot-note" id="footmeta"></p>
+    </div>
+  </main>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(s,r){return (r||document).querySelector(s)};
+  var esc=function(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"})[c]})};
+  var fmt=function(n){return Number(n||0).toLocaleString("en-US")};
+  var pct=function(a,b){return b?Math.round(a/b*100):0};
+  var openRuns={}; // slug → open state, preserved across refreshes
+  var STATE=null;
+
+  function get(){return fetch("/api/state").then(function(r){return r.json()})}
+  function apply(ops){return fetch("/api/apply",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ops:ops})}).then(function(r){return r.json()})}
+
+  // ---- renderers (data panels; settings rendered separately so edits aren't clobbered) ----
+  function renderData(s){
+    STATE=s;
+    var st=s.stats;
+    $("#livetxt").textContent = s.exists ? "live · "+st.total+" run"+(st.total===1?"":"s") : "no memory file yet";
+    $("#footmeta").textContent = "reading "+s.memPath+"  ·  refreshed "+new Date(s.generatedAt).toLocaleTimeString();
+
+    $("#cards").innerHTML =
+      card(st.total,"Runs", s.exists?"governed end-to-end":"none yet") +
+      card(pct(st.shippable,st.total)+"%","Shippable", st.shippable+" of "+st.total+" cleared") +
+      card(fmt(st.totOut),"Est. tokens out", "≈ "+fmt(st.totIn)+" in · estimated") +
+      card(st.inDeliberation,"In deliberation", st.inDeliberation?"awaiting your call":"none open") +
+      card((s.learnedRules||[]).length,"Learned rules", "forged from rejections");
+
+    // token panel
+    $("#tokbig").innerHTML = "<div><b>"+fmt(st.totOut)+"</b><span>out · est</span></div><div><b>"+fmt(st.totIn)+"</b><span>in · est</span></div>";
+    var ms=Object.keys(st.byMission||{}), maxOut=Math.max(1,...ms.map(function(k){return st.byMission[k].out}));
+    $("#tokmissions").innerHTML = ms.length? ms.map(function(k){var m=st.byMission[k];
+      return '<div class="mrow"><div class="mrow__k">'+esc(k)+'</div><div class="mrow__v">'+fmt(m.out)+' out · '+m.count+' run'+(m.count===1?"":"s")+'</div><div class="mbar"><i style="width:'+Math.round(m.out/maxOut*100)+'%"></i></div></div>';
+    }).join("") : '<p class="muted" style="font-size:.84rem">No runs to cost yet.</p>';
+    $("#toknote").textContent = s.tokenNote;
+
+    // runs
+    $("#runcount").textContent = st.total ? st.total+" total" : "";
+    $("#runs").innerHTML = (s.runs&&s.runs.length)? s.runs.slice().reverse().map(runHTML).join("") : '<div class="empty">No runs yet. Run <code>ed-agent "your requirement"</code> in the terminal, then hit Refresh.</div>';
+    bindRuns();
+
+    // learned rules
+    $("#rulecount").textContent = (s.learnedRules||[]).length? s.learnedRules.length+" held":"";
+    $("#rules").innerHTML = (s.learnedRules&&s.learnedRules.length)? s.learnedRules.map(ruleHTML).join("")
+      : '<div class="empty">Nothing learned yet. When you reject something with a reason (<code>--reject</code> or a resolved checkpoint), the rule it forges shows here.</div>';
+    bindRules();
+
+    // context
+    var c=s.context||{facts:[],lastBrief:""};
+    $("#context").innerHTML =
+      (c.facts.length? '<ul style="margin:0;padding-left:18px">'+c.facts.map(function(f){return '<li style="font-size:.84rem;color:var(--dim);margin:5px 0">'+esc(f)+'</li>'}).join("")+'</ul>' : '<p class="muted" style="font-size:.84rem">—</p>')
+      + (c.lastBrief? '<div style="margin-top:13px;border-top:1px dashed var(--line2);padding-top:12px"><div class="eyebrow" style="margin-bottom:7px">Last brief</div><pre style="margin:0;white-space:pre-wrap;font-family:var(--mono);font-size:.74rem;color:var(--faint);line-height:1.5">'+esc(c.lastBrief)+'</pre></div>' : "");
+  }
+
+  function card(big,label,sub){return '<div class="card"><b>'+esc(big)+'</b><span>'+esc(label)+'</span><small>'+esc(sub)+'</small></div>'}
+
+  function runHTML(r){
+    var shipPill = r.shippable? '<span class="pill pill--ship">✓ shippable</span>'
+      : (r.deliberation.some(function(d){return d.status==="open"})? '<span class="pill pill--delib">◆ in deliberation</span>' : '<span class="pill pill--pending">⏸ gate pending</span>');
+    var stageMax=Math.max(1,...r.stages.map(function(x){return x.outTok}));
+    var rows=r.stages.map(function(x){
+      return '<tr><td>'+esc(x.stage)+'</td><td>'+esc(x.agent)+'</td><td class="n">'+fmt(x.inTok)+'</td><td class="n">'+fmt(x.outTok)+'</td><td><div class="obar"><i style="width:'+Math.round(x.outTok/stageMax*100)+'%"></i></div></td></tr>';
+    }).join("");
+    var gateChips=r.gates.map(function(g){return '<span class="chip '+(g.status==="approved"?"ok":"wait")+'">'+(g.status==="approved"?"✓":"⏸")+' '+esc(g.name)+(g.by?" · "+esc(g.by):"")+'</span>'}).join("");
+    var delChips=r.deliberation.map(function(d){return '<span class="chip '+(d.status==="open"?"open":"ok")+'">'+(d.status==="open"?"◆":"✓")+' '+esc(d.name)+(d.questions?" · "+d.questions+"Q":"")+'</span>'}).join("");
+    return '<div class="run'+(openRuns[r.slug]?" open":"")+'" data-slug="'+esc(r.slug)+'">'
+      +'<div class="run__top"><span class="mtag">'+esc(r.mission.split(" / ")[0])+'</span>'
+      +'<div class="run__req">'+esc(r.requirement)+' <span class="d">· '+esc(r.domain)+(r.jurisdiction&&r.jurisdiction!=="—"?" · "+esc(r.jurisdiction):"")+'</span></div>'
+      +shipPill+'<span class="run__io">'+fmt(r.totalOut)+' out · '+fmt(r.totalIn)+' in <span class="chev">›</span></span></div>'
+      +'<div class="run__detail">'
+        +'<div class="meta">'+gateChips+delChips+'<span class="chip">research '+(r.coverage==null?"—":r.coverage+"%")+(r.conflicts?" · "+r.conflicts+" quarantined":"")+'</span></div>'
+        +'<table class="stab"><tr><td style="color:var(--faint)">stage</td><td style="color:var(--faint)">owner</td><td class="n" style="color:var(--faint)">in</td><td class="n" style="color:var(--faint)">out</td><td></td></tr>'+rows+'</table>'
+        +'<p class="muted" style="font-size:.72rem;margin:9px 2px 0">'+esc(r.shippableNote||"")+' · est. tokens, not a bill.</p>'
+      +'</div></div>';
+  }
+  function bindRuns(){
+    Array.prototype.forEach.call(document.querySelectorAll(".run__top"),function(t){
+      t.addEventListener("click",function(){var run=t.parentNode,slug=run.getAttribute("data-slug");run.classList.toggle("open");openRuns[slug]=run.classList.contains("open")});
+    });
+  }
+
+  function ruleHTML(r){
+    var col=r.severity==="critical"?"var(--red)":r.severity==="high"?"var(--amber)":"var(--gold-dim)";
+    return '<div class="lr" data-id="'+esc(r.id)+'"><div><span class="lr__id">'+esc(r.id)+'</span><span class="lr__sev" style="color:'+col+';border-color:'+col+'">'+esc(r.severity)+'</span>'
+      +'<div class="lr__msg">'+esc(r.message)+'</div><div class="lr__trig">re-checks for ('+esc(r.kind)+'): '+esc(r.pattern)+'</div></div>'
+      +'<button class="x" type="button" data-rm="'+esc(r.id)+'">forget</button></div>';
+  }
+  function bindRules(){
+    Array.prototype.forEach.call(document.querySelectorAll("[data-rm]"),function(b){
+      b.addEventListener("click",function(){ b.disabled=true; b.textContent="…"; apply([{op:"remove-rule",id:b.getAttribute("data-rm")}]).then(renderAll); });
+    });
+  }
+
+  // ---- settings (rendered once on load + after save) ----
+  var MISSIONS=[["","(auto-detect)"],["finance","Regulated finance"],["code","Code / engineering"],["marketing","Marketing / growth"],["contract","Contract / legal"],["optimize","Optimize / review"]];
+  var JURS=[["","(auto)"],["us","United States"],["eu","European Union"],["uk","United Kingdom"],["au","Australia"],["sg","Singapore"],["jp","Japan"],["global","Global"]];
+  function opt(list,val){return list.map(function(o){return '<option value="'+esc(o[0])+'"'+(o[0]===val?" selected":"")+'>'+esc(o[1])+'</option>'}).join("")}
+  function renderSettings(s){
+    var p=s.preferences.prefs||{};
+    var box=$("#settings");
+    box.innerHTML =
+      '<div class="row2"><div class="field"><label>Default mission</label><select id="set-mission">'+opt(MISSIONS,p.mission||"")+'</select></div>'
+      +'<div class="field"><label>Jurisdiction (finance)</label><select id="set-jur">'+opt(JURS,p.jurisdiction||"")+'</select></div></div>'
+      +'<div class="row2"><div class="field"><label>Loop severity target</label><input type="number" id="set-target" min="0" max="60" value="'+esc(p.target!=null?p.target:"")+'" placeholder="8"></div>'
+      +'<div class="field"><label>Loop budget (max iter)</label><input type="number" id="set-loopmax" min="1" max="20" value="'+esc(p["loop-max"]!=null?p["loop-max"]:"")+'" placeholder="6"></div></div>'
+      +'<label class="tog"><input type="checkbox" id="set-loop"'+(p.loop==="true"?" checked":"")+'><span class="tog__sw"></span><span class="tog__t">Run the self-correction loop by default</span></label>'
+      +'<label class="tog"><input type="checkbox" id="set-strict"'+(p.strict==="true"?" checked":"")+'><span class="tog__sw"></span><span class="tog__t">Strict — gate on critical red-team findings</span></label>'
+      +'<div class="field" style="margin-top:12px"><label>Voice / tone note</label><input type="text" id="set-tone" value="'+esc(p.tone||"")+'" placeholder="e.g. terse"></div>'
+      +'<div class="field"><label>Likes the agent should respect</label><div class="tags" id="likes"></div>'
+        +'<div style="display:flex;gap:8px;margin-top:8px"><input type="text" id="like-in" placeholder="add a like…" style="flex:1"><button class="btn" id="like-add" type="button">Add</button></div></div>'
+      +'<div class="save-row"><button class="btn btn--gold" id="save" type="button">Save settings</button><span class="saved" id="saved">✓ saved to your memory file</span></div>'
+      +'<p class="pane__note">These write <span class="mono">prefer:</span> / <span class="mono">like:</span> lines in your <span class="mono">Ed_agents_Claude.md</span> — the agent applies them to <em>unset</em> run options next time. You can edit the same lines by hand.</p>';
+    renderLikes(s);
+    $("#save").addEventListener("click",saveSettings);
+    $("#like-add").addEventListener("click",addLike);
+    $("#like-in").addEventListener("keydown",function(e){if(e.key==="Enter")addLike()});
+  }
+  function renderLikes(s){
+    $("#likes").innerHTML = (s.preferences.likes||[]).map(function(t){return '<span class="tag">'+esc(t)+'<button type="button" data-like="'+esc(t)+'">×</button></span>'}).join("") || '<span class="muted" style="font-size:.78rem">none yet</span>';
+    Array.prototype.forEach.call(document.querySelectorAll("[data-like]"),function(b){b.addEventListener("click",function(){apply([{op:"remove-tag",kind:"like",text:b.getAttribute("data-like")}]).then(function(s){STATE=s;renderLikes(s)})})});
+  }
+  function addLike(){var v=$("#like-in").value.trim();if(!v)return;$("#like-in").value="";apply([{op:"add-tag",kind:"like",text:v}]).then(function(s){STATE=s;renderLikes(s)})}
+  function saveSettings(){
+    var cur=(STATE.preferences.prefs)||{};
+    var ops=[];
+    function setOrUnset(key,val){ val=(val==null?"":String(val).trim());
+      if(val==="") { if(cur[key]!=null) ops.push({op:"unset-pref",key:key}); }
+      else if(String(cur[key])!==val) ops.push({op:"set-pref",key:key,value:val}); }
+    setOrUnset("mission",$("#set-mission").value);
+    setOrUnset("jurisdiction",$("#set-jur").value);
+    setOrUnset("target",$("#set-target").value);
+    setOrUnset("loop-max",$("#set-loopmax").value);
+    setOrUnset("tone",$("#set-tone").value);
+    var loop=$("#set-loop").checked?"true":""; if((cur.loop==="true")!==$("#set-loop").checked) ops.push(loop?{op:"set-pref",key:"loop",value:"true"}:{op:"unset-pref",key:"loop"});
+    var strict=$("#set-strict").checked?"true":""; if((cur.strict==="true")!==$("#set-strict").checked) ops.push(strict?{op:"set-pref",key:"strict",value:"true"}:{op:"unset-pref",key:"strict"});
+    if(!ops.length){flashSaved();return;}
+    var btn=$("#save");btn.disabled=true;btn.textContent="saving…";
+    apply(ops).then(function(s){renderData(s);renderSettings(s);flashSaved();});
+  }
+  function flashSaved(){var el=$("#saved");if(!el)return;el.classList.add("on");setTimeout(function(){el.classList.remove("on")},1600)}
+
+  function renderAll(s){renderData(s);renderSettings(s)}
+
+  function refresh(){return get().then(renderData).catch(function(e){$("#livetxt").textContent="disconnected"})}
+
+  // boot
+  get().then(function(s){renderAll(s)}).catch(function(){$("#livetxt").textContent="cannot reach the server"});
+  $("#refresh").addEventListener("click",refresh);
+  // gentle auto-refresh of the DATA panels only (never the settings form you're editing)
+  setInterval(refresh,7000);
+})();
+</script>
+</body>
+</html>

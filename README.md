@@ -260,6 +260,31 @@ surfaces the questions; the conversation — and the decision — stay between y
 **Any other LLM (Hermes, …):** paste the operating contract from **[`AGENTS.md`](./AGENTS.md)**
 into the system prompt — the host then *behaves* as Ed Agent.
 
+## The control room — a local dashboard
+
+Not everyone reads code. `ed-agent dashboard` opens a **local control room** so you can *see*
+what Ed Agent is doing and tune it without the command line:
+
+```bash
+ed-agent dashboard            # → http://127.0.0.1:4317  (add --open to launch the browser)
+```
+
+- **See every governed run** — drill into any run's stages, gates, deliberation checkpoints,
+  and per-stage **estimated** token cost.
+- **See what it cost** — cumulative + per-mission est. tokens, labelled as estimates (cost
+  governance, *not a bill*).
+- **See what it learned** — the rules forged from your rejections; forget any you disagree with.
+- **Tune how it behaves** — default mission, jurisdiction, the loop's severity target and budget,
+  strict mode, tone, likes — saved as plain `prefer:`/`like:` lines in your `Ed_agents_Claude.md`
+  (so you can still edit by hand and keep it in git). The engine applies them to *unset* run
+  options next time.
+
+It is **honest by construction**: a zero-dependency `node:http` server bound to **127.0.0.1
+only**, serving one page that makes **zero external requests** — nothing about your runs leaves
+the machine. It reads (and edits) the *same* human-readable memory file the CLI uses — the single
+source of truth. It's a control room over real, discrete runs, not a live always-on monitor, and
+it doesn't replace the CLI/MCP — it observes and tunes them.
+
 ## Different from eds-mcp
 
 [**eds-mcp**](https://github.com/Edwson/eds-mcp) is the **design-system engine** (it scaffolds

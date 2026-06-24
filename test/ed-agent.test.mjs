@@ -90,6 +90,13 @@ ok(p.prefs.mission === 'marketing' && p.likes.includes('dense tables'), 'prefere
 const applied = await run('Make me something', { outDir: join(tmp, 'pref'), memoryPath: mem, quiet: true });
 ok(applied.mission === 'marketing', 'preferred mission applied when none is specified');
 ok(applied.prefsApplied.some((x) => x.includes('marketing')), 'run reports the applied preference');
+// dashboard-set run defaults (target/loop/strict/loop-max) are honored — but only when UNSET (byte-stable)
+const defmem = join(tmp, 'defaults.md');
+prefs.record(defmem, [{ kind: 'prefer', text: 'target: 4' }, { kind: 'prefer', text: 'loop: true' }, { kind: 'prefer', text: 'strict: true' }, { kind: 'prefer', text: 'loop-max: 5' }]);
+const ap = prefs.apply(prefs.recall(defmem), {});
+ok(ap.opts.target === 4 && ap.opts.loop === true && ap.opts.strict === true && ap.opts.loopMax === 5, 'prefs.apply honors dashboard-set target/loop/strict/loop-max defaults');
+ok(prefs.apply(prefs.recall(defmem), { target: 9, loop: false }).opts.target === 9, 'an explicit run option still overrides the preference (fill-only-when-unset)');
+ok(prefs.apply({ prefs: {}, likes: [], dislikes: [], concepts: [] }, {}).applied.length === 0, 'no preferences → nothing applied (byte-stable)');
 
 console.log('\nmemory ledger');
 const memTxt = readFileSync(mem, 'utf8');

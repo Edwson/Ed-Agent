@@ -62,6 +62,12 @@ export function apply(prefs, opts) {
   const o = { ...opts };
   if (!o.mission && prefs.prefs.mission) { o.mission = prefs.prefs.mission; applied.push(`mission=${o.mission}`); }
   if (!o.jurisdiction && prefs.prefs.jurisdiction) { o.jurisdiction = prefs.prefs.jurisdiction; applied.push(`jurisdiction=${o.jurisdiction}`); }
+  // run defaults the operator can set (e.g. via the dashboard) — fill only when UNSET, so a
+  // memory with no such preference leaves every run byte-stable.
+  if (o.target == null && prefs.prefs.target != null) { o.target = Number(prefs.prefs.target); applied.push(`target=${o.target}`); }
+  if (o.loopMax == null && prefs.prefs['loop-max'] != null) { o.loopMax = Number(prefs.prefs['loop-max']); applied.push(`loop-max=${o.loopMax}`); }
+  if (!o.loop && prefs.prefs.loop === 'true') { o.loop = true; applied.push('loop'); }
+  if (!o.strict && prefs.prefs.strict === 'true') { o.strict = true; applied.push('strict'); }
   if (prefs.prefs.tone) applied.push(`tone=${prefs.prefs.tone}`);
   return { opts: o, applied };
 }

@@ -15,6 +15,7 @@
     "bin",
     "src",
     "mcp",
+    "dashboard",
     "knowledge",
     "img/ed_agent.png",
     "AGENTS.md",
@@ -30,6 +31,8 @@
     "example:loop": "node bin/ed-agent.mjs --refine examples/sample-loop/input-artifact.md --mission code --target 6",
     "test": "node test/ed-agent.test.mjs",
     "test:mcp": "node mcp/test-mcp.mjs",
+    "test:dashboard": "node dashboard/test-dashboard.mjs",
+    "dashboard": "node dashboard/server.mjs",
     "serve": "node mcp/server.mjs"
   },
   "engines": {
