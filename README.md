@@ -342,4 +342,4 @@ npm run test:mcp  # live MCP-protocol test (needs the optional SDK)
 
 ## License
 
-MIT © Ed Chen — [edwson.com](https://www.edwson.com)
+MIT © Ed Chen — [edwson.com](https://www.edwson.com) [Case Study](https://edwson.com/project-Ed_Agent.html)
