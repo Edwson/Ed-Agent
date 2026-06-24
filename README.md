@@ -25,6 +25,13 @@ preferences**, **quality disciplines** (ban AI-tone filler · quantify-or-flag �
 real artifacts at every stage, and a quantified ledger. Drop it into any bot via **MCP** or the
 **`AGENTS.md`** brief. Zero-dependency core (Node 18+).
 
+**New in v0.6 — the inner loop.** Add `--loop` and the produced artifact is refined in a
+deterministic **produce → verify → (rollback)** inner loop *before* review, with four safety
+mechanisms that make a self-iterating loop survivable instead of a runaway: a **severity gate**, an
+**overshoot rollback**, **iron-law HARD-HALTS** (a crossed red line never bypasses you), and a
+**budget fuse** — plus a **WHAT / WHY / PATTERN** audit trail and a **learning flywheel** that
+forges a durable rule from every rejection. The model produces; the harness governs.
+
 > _Click the mascot above to watch the intro._
 
 > **Honest by construction.** Ed Agent does not pretend to *understand* your business — a
@@ -152,6 +159,55 @@ node bin/ed-agent.mjs "…same…" --not "do not migrate the payments schema" --
 Standalone, no lifecycle: **`ed_agent_redteam`** and **`ed_agent_ground`** (MCP), or
 `skills/redteam.mjs` + `skills/grounding.mjs` as a library.
 
+## The inner loop — produce → verify → (rollback) *(v0.6)*
+
+The whole thing so far is the **chains**: human gates, checkpoints, "never bypass". v0.6 adds the
+**engine** — an opt-in inner loop that refines the produced artifact *before* review, scored every
+iteration by the same deterministic assessors. It can self-correct fast precisely **because** four
+safety mechanisms keep it from running away (the "Loopmaxxing" failure mode where a loop burns the
+budget without converging):
+
+1. **Severity gate** — a composite score from the verified assessors (red team + grounding + blind
+   score + substance). The loop **exits when severity ≤ target**.
+2. **Overshoot rollback** — a version buffer keeps the best-severity artifact. If a producer makes
+   it *worse* for too long, it **rolls back to the best version and stops**. (The in-harness
+   remediator is monotone so it can't overshoot; this is the safety valve for when you wire a
+   **non-deterministic host LLM** as the producer.)
+3. **Iron-law HARD-HALT** — a crossed **red line** (never bypass a human gate · never move a secret
+   off-box · finance: never skip KYC/AML, never auto-move money) stops the loop *immediately* and
+   opens a checkpoint. A red line is a boundary, not a judgment call — the harness never crosses it
+   silently.
+4. **Budget fuse** — a hard `--loop-max` cap. The loop can never run forever.
+
+Every iteration writes a **WHAT / WHY / PATTERN** line — a court-grade audit trail of how the
+artifact changed and why the loop did what it did — and each iteration runs under **forced amnesia**
+(the producer sees only the current artifact + its findings, never a growing transcript, so it
+doesn't collapse over many iterations). The deterministic loop **converges to the floor of what it
+can prove**, then **escalates the residual to a human — it never fakes a fix.**
+
+```bash
+node bin/ed-agent.mjs "Add a payment retry flow" --mission code --loop   # self-correct the build
+node bin/ed-agent.mjs --refine messy-draft.md --mission code --target 6   # standalone loop on a file
+```
+
+```text
+# → severity 47 → 18 over 4 iterations: fixed hardcoded-secret → empty-catch → AI-tone filler,
+#   then PLATEAU — the residual (an unquantified claim + marketing "tell" words) is escalated, not faked.
+```
+
+**The learning flywheel.** When you **reject** something with a reason, Ed Agent forges a durable,
+machine-checkable rule into its memory and **re-checks for it on every later run** — each rejection
+makes the next run stricter about exactly what you flagged:
+
+```bash
+node bin/ed-agent.mjs --reject "trust: violates MiFID II best execution"   # forge a learned rule
+# → next run lists it as a concern and the loop scores against it (deterministic, not opaque ML)
+```
+
+Off by default → the verdict stays **byte-stable**. Standalone surfaces: **`ed_agent_loop`**,
+**`ed_agent_ironcheck`**, **`ed_agent_learn`** (MCP), or `src/loop.mjs` + `src/skills/ironlaws.mjs`
++ `src/flywheel.mjs` as a library. A full sample is committed in **[`examples/sample-loop/`](./examples/sample-loop/)**.
+
 ## The nine stages + two checkpoints
 
 `intake → context → analyze →` **`◆FRAME`** `→ research → ledger → plan → produce → review →`
@@ -186,10 +242,13 @@ and applies the preferred mission / jurisdiction automatically.
 { "mcpServers": { "ed-agent": { "command": "npx", "args": ["-y", "github:Edwson/Ed-Agent", "ed-agent-mcp"] } } }
 ```
 
-Tools (11): `ed_agent_run` · `ed_agent_deliberate` (audit any artifact/diff — "should I trust
-this?") · `ed_agent_redteam` (mission-aware adversarial scan) · `ed_agent_ground` (claim
-grounding, three states) · `ed_agent_trust_scan` (fast trust + substance) · `ed_agent_optimize`
-(the grand-mentor · 総監督 review) · `ed_agent_quality_scan` · `ed_agent_missions` · `ed_agent_skills` ·
+Tools (14): `ed_agent_run` · `ed_agent_loop` *(v0.6 — self-correct an artifact: severity gate ·
+overshoot rollback · iron-law halt + the audit trail)* · `ed_agent_ironcheck` *(v0.6 — scan for
+crossed red lines)* · `ed_agent_learn` *(v0.6 — the flywheel: forge a learned rule from a
+rejection)* · `ed_agent_deliberate` (audit any artifact/diff — "should I trust this?") ·
+`ed_agent_redteam` (mission-aware adversarial scan) · `ed_agent_ground` (claim grounding, three
+states) · `ed_agent_trust_scan` (fast trust + substance) · `ed_agent_optimize` (the grand-mentor ·
+総監督 review) · `ed_agent_quality_scan` · `ed_agent_missions` · `ed_agent_skills` ·
 `ed_agent_remember` · `ed_agent_recall`. Enable with `npm install @modelcontextprotocol/sdk zod`
 (optional — the CLI and library are zero-dependency).
 

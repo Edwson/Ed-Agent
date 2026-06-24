@@ -13,6 +13,9 @@ import { trustScore, substanceScan, captureIntent } from '../src/skills/trust.mj
 import { redTeamScan, redTeamBlock } from '../src/skills/redteam.mjs';
 import { groundClaims, groundingBlock } from '../src/skills/grounding.mjs';
 import { auditArtifact } from '../src/deliberate.mjs';
+import { refineLoop, loopBlock } from '../src/loop.mjs';
+import { checkIronLaws, ironLawBlock } from '../src/skills/ironlaws.mjs';
+import { forge, recallRules } from '../src/flywheel.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
@@ -48,28 +51,28 @@ export function buildServer() {
     {
       title: 'Run Ed Agent on a requirement',
       description: 'Drive one plain-English requirement through the nine-stage lifecycle with the auto-detected (or forced) squad. Returns the certification, the research brief, the deliberation checkpoints, and the artifact list. The run stops at two deliberation checkpoints (FRAME, TRUST) and stays IN DELIBERATION until you answer the open questions — supply intent/done/nonGoals up front and resolve[] to clear them. Human gates stay pending unless approve/signoff names are supplied. The host loop: run → read the open questions → discuss with the human → run again with the answers in resolve[].',
-      inputSchema: { requirement: z.string().describe('the plain-English requirement'), mission: z.enum(['finance', 'code', 'marketing', 'contract', 'optimize']).optional(), jurisdiction: z.string().optional(), intent: z.string().optional().describe('the business goal (the outcome, not the task) — clears the FRAME checkpoint'), done: z.string().optional().describe('what "done" means in business terms'), nonGoals: z.string().optional().describe('out of scope, ;-separated'), resolve: z.array(z.string()).optional().describe('answers to open checkpoints, each "frame: ..." / "trust: ..." / "redteam: ..."'), approve: z.string().optional().describe('name that clears the plan/design gate'), signoff: z.string().optional().describe('name that clears the certification gate'), strict: z.boolean().optional().describe('gate the verdict on red-team critical findings + contradicted claims (default: report-only)') },
+      inputSchema: { requirement: z.string().describe('the plain-English requirement'), mission: z.enum(['finance', 'code', 'marketing', 'contract', 'optimize']).optional(), jurisdiction: z.string().optional(), intent: z.string().optional().describe('the business goal (the outcome, not the task) — clears the FRAME checkpoint'), done: z.string().optional().describe('what "done" means in business terms'), nonGoals: z.string().optional().describe('out of scope, ;-separated'), resolve: z.array(z.string()).optional().describe('answers to open checkpoints, each "frame: ..." / "trust: ..." / "redteam: ..."'), approve: z.string().optional().describe('name that clears the plan/design gate'), signoff: z.string().optional().describe('name that clears the certification gate'), strict: z.boolean().optional().describe('gate the verdict on red-team critical findings + contradicted claims (default: report-only)'), loop: z.boolean().optional().describe('run the v0.6 inner self-correction loop (severity gate + overshoot rollback + iron-law hard-halt + budget fuse) before review'), reject: z.array(z.string()).optional().describe('flywheel — forge learned rules from rejections, each "node: reason" (re-checked on later runs)') },
     },
     async (args) => {
       const out = mkdtempSync(join(tmpdir(), 'ed-agent-'));
-      const r = await run(args.requirement, { mission: args.mission, jurisdiction: args.jurisdiction, intent: args.intent, done: args.done, nonGoals: args.nonGoals, resolve: args.resolve, approve: args.approve, signoff: args.signoff, strict: args.strict, outDir: out, memoryPath, quiet: true });
+      const r = await run(args.requirement, { mission: args.mission, jurisdiction: args.jurisdiction, intent: args.intent, done: args.done, nonGoals: args.nonGoals, resolve: args.resolve, approve: args.approve, signoff: args.signoff, strict: args.strict, loop: args.loop, reject: args.reject, outDir: out, memoryPath, quiet: true });
       const files = readdirSync(out, { recursive: true }).filter((f) => typeof f === 'string').sort();
       const delib = r.checkpoints.map((cp) => cp.status === 'open' ? `◆ ${cp.name} (${cp.questions.length}Q)` : `✓ ${cp.name}`).join(' · ');
       const qs = r.openQuestions.length ? `\n\nIN DELIBERATION — answer these with the human, then run again with resolve[]:\n${r.openQuestions.map((q, i) => `  ${i + 1}. [${q.node}] ${q.question}`).join('\n')}` : '';
-      const head = `# Ed Agent · ${r.missionName} squad\nRequirement: ${args.requirement}\nSquad: ${r.squad.join(' · ')}\nTrust: ${r.trust.level} (${r.trust.score}/100) · Substance: ${r.substance.verdict}\nGates: ${r.gates.map((g) => g.status === 'approved' ? '✓ ' + g.name : '⏸ ' + g.name).join(' · ')}\nDeliberation: ${delib}\nVerdict: ${r.shippable ? 'SHIPPABLE — gates + deliberation cleared' : 'NOT YET SHIPPABLE — ' + (r.openQuestions.length ? 'in deliberation (not bypassed)' : 'human gate(s) pending')}\nI/O (est): ${r.totals.totIn} in / ${r.totals.totOut} out\nArtifacts (${files.length}) in: ${out}${qs}`;
+      const head = `# Ed Agent · ${r.missionName} squad\nRequirement: ${args.requirement}\nSquad: ${r.squad.join(' · ')}\nTrust: ${r.trust.level} (${r.trust.score}/100) · Substance: ${r.substance.verdict}\nGates: ${r.gates.map((g) => g.status === 'approved' ? '✓ ' + g.name : '⏸ ' + g.name).join(' · ')}\nDeliberation: ${delib}${r.loop ? `\nInner loop: ${r.loop.exitReason} · severity ${r.loop.startScore}→${r.loop.endScore} · ${r.loop.iterations} iter${r.loop.rolledBack ? ' · rolled back' : ''}${r.loop.ironLawCrossed ? ' · RED LINE crossed (escalated)' : ''}` : ''}\nVerdict: ${r.shippable ? 'SHIPPABLE — gates + deliberation cleared' : 'NOT YET SHIPPABLE — ' + (r.openQuestions.length ? 'in deliberation (not bypassed)' : 'human gate(s) pending')}\nI/O (est): ${r.totals.totIn} in / ${r.totals.totOut} out\nArtifacts (${files.length}) in: ${out}${qs}`;
       return text([head, '\n---\n', read(out, '10-certification.md'), '\n---\n', read(out, 'c2-trust-checkpoint.md')].join('\n'));
     });
 
   server.registerTool('ed_agent_optimize',
     {
-      title: 'Optimize / review any content (總導師 squad)',
-      description: 'Run the five-agent review SOP on existing content (a deck, case study, landing page, clause): blind-score diagnostic → adversarial debate → de-AI humanize → optimized version, in the three-part output format (專家診斷回饋 / 優化後的最終版本 / 商業價值評估). Bans AI-tone filler, quantifies or flags every claim, gives no blind praise. If the content is a regulated-finance surface, the Data officer quantifies it against the eds-mcp engine. Human gates stay pending unless approve/signoff are supplied.',
+      title: 'Optimize / review any content (grand-mentor · 総監督 squad)',
+      description: 'Run the five-agent review SOP on existing content (a deck, case study, landing page, clause): blind-score diagnostic → adversarial debate → de-AI humanize → optimized version, in the three-part output format (Expert diagnostic / Optimized version / Business-value assessment · 専門家診断 / 最適化版 / ビジネス価値評価). Bans AI-tone filler, quantifies or flags every claim, gives no blind praise. If the content is a regulated-finance surface, the Data officer quantifies it against the eds-mcp engine. Human gates stay pending unless approve/signoff are supplied.',
       inputSchema: { content: z.string().describe('the content to optimize — paste it, or a thing to critique'), jurisdiction: z.string().optional(), approve: z.string().optional(), signoff: z.string().optional() },
     },
     async (args) => {
       const out = mkdtempSync(join(tmpdir(), 'ed-agent-opt-'));
       const r = await run(args.content, { mission: 'optimize', jurisdiction: args.jurisdiction, approve: args.approve, signoff: args.signoff, outDir: out, memoryPath, quiet: true });
-      const head = `# Ed Agent · 總導師 (optimize) squad\nSquad: ${r.squad.join(' · ')}\nBlind diagnostic: ${r.conflicts} AI-tone tell(s) flagged\nGates: ${r.gates.map((g) => g.status === 'approved' ? '✓ ' + g.name : '⏸ ' + g.name).join(' · ')}\nVerdict: ${r.shippable ? 'SHIPPABLE' : 'NOT YET SHIPPABLE — human gate(s) pending (not bypassed)'}\nArtifacts in: ${out}`;
+      const head = `# Ed Agent · grand-mentor (総監督 · optimize) squad\nSquad: ${r.squad.join(' · ')}\nBlind diagnostic: ${r.conflicts} AI-tone tell(s) flagged\nGates: ${r.gates.map((g) => g.status === 'approved' ? '✓ ' + g.name : '⏸ ' + g.name).join(' · ')}\nVerdict: ${r.shippable ? 'SHIPPABLE' : 'NOT YET SHIPPABLE — human gate(s) pending (not bypassed)'}\nArtifacts in: ${out}`;
       return text([head, '\n---\n', read(out, '09-final-output.md'), '\n---\n', read(out, '04-research-brief.md')].join('\n'));
     });
 
@@ -131,6 +134,34 @@ export function buildServer() {
       const r = groundClaims(args.artifact, { mission: args.mission ? missionById(args.mission) : {}, intent });
       return text(groundingBlock(r));
     });
+
+  server.registerTool('ed_agent_loop',
+    {
+      title: 'Inner loop — self-correct an artifact (severity gate · overshoot rollback · iron-law halt)',
+      description: 'Refine any artifact (code, copy, a clause, a regulated surface) in a deterministic produce→verify→(rollback) loop. Every iteration it scores severity with the verified assessors (red team + grounding + blind score + substance), applies the single worst deterministically-fixable finding, discards any regression (overshoot rollback — the safety valve for a non-deterministic producer), HARD-HALTS the moment a red line is crossed, and stops at a budget fuse. Returns the WHAT/WHY/PATTERN audit trail, the severity trajectory, and the residual it escalates to a human (the deterministic loop fixes what it can prove and never fakes the rest). Zero-LLM: the model produces, the harness governs.',
+      inputSchema: { artifact: z.string().describe('the artifact to self-correct'), mission: z.enum(['finance', 'code', 'marketing', 'contract', 'optimize']).optional(), intent: z.string().optional().describe('the business goal — enables the non-goal contradiction check'), nonGoals: z.string().optional().describe('out of scope, ;-separated'), maxIter: z.number().optional().describe('iteration budget / fuse (default 6)'), target: z.number().optional().describe('severity target — exit at/under it (default 8)') },
+    },
+    async (args) => {
+      const intent = captureIntent(args.artifact, { intent: args.intent, nonGoals: args.nonGoals });
+      const r = refineLoop({ artifact: args.artifact, mission: args.mission ? missionById(args.mission) : {}, intent, learnedRules: recallRules(memoryPath), maxIter: args.maxIter, target: args.target });
+      return text(loopBlock(r));
+    });
+
+  server.registerTool('ed_agent_ironcheck',
+    {
+      title: 'Iron-law scan — the red lines',
+      description: 'Scan an artifact against the red lines for a mission. Universal: never auto-approve/sign-off/bypass a human gate, never move a secret to an external destination, never disable a security/compliance/audit control to make something pass. Finance: never skip/bypass KYC·AML·CDD·EDD·sanctions·suitability, never auto-execute money movement without human sign-off, never bypass the fiduciary sign-off. Code: no destructive prod-data ops. Contract: no uncapped liability. Marketing: no guaranteed-return claims. An iron law is a hard boundary, not a judgment call — deterministic, zero-LLM, so it cannot be reasoned around.',
+      inputSchema: { artifact: z.string().describe('the artifact to scan for crossed red lines'), mission: z.enum(['finance', 'code', 'marketing', 'contract', 'optimize']).optional() },
+    },
+    async (args) => text(ironLawBlock(checkIronLaws(args.artifact, args.mission || 'universal'))));
+
+  server.registerTool('ed_agent_learn',
+    {
+      title: 'Flywheel — forge a learned rule from a rejection',
+      description: 'Teach Ed Agent from a human rejection: give the checkpoint node and the reason, and it forges a durable, machine-checkable rule into its memory (a trigger extracted from your own words — a cited regulation, a quoted phrase, or the load-bearing keywords — plus your reason verbatim). On later runs that rule is listed as an analysis concern and scored by the inner loop, so each rejection makes the next run stricter about exactly what you flagged. Deterministic recorded heuristic, not opaque ML.',
+      inputSchema: { reason: z.string().describe('why it was rejected, in your words — e.g. "violates MiFID II best execution"'), node: z.enum(['frame', 'trust', 'redteam', 'review']).optional().describe('the checkpoint it was rejected at (default review)') },
+    },
+    async (args) => { const r = forge(memoryPath, { node: args.node || 'review', reason: args.reason }); const rules = recallRules(memoryPath); return text(`Forged ${r ? r.id : '—'}${r && r.duplicate ? ' (already held)' : ''}. Now holding ${rules.length} learned rule(s) the next run re-checks: ${rules.map((x) => x.id).join(', ') || '—'}`); });
 
   server.registerTool('ed_agent_remember',
     { title: 'Teach Ed Agent a preference', description: 'Persist a preference/like/dislike/concept to Ed Agent\'s memory so it is recalled and applied on later runs (across sessions and hosts).', inputSchema: { kind: z.enum(['concept', 'prefer', 'like', 'dislike']), text: z.string().describe('for "prefer", use "key: value", e.g. "jurisdiction: uk"') } },

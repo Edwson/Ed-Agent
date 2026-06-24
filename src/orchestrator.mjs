@@ -18,6 +18,9 @@ import { frameAssessment, trustAssessment } from './deliberate.mjs';
 import { checkpoint as makeCheckpoint, allCheckpointsCleared, openCheckpoints, openQuestions, checkpointLine, parseResolutions } from './checkpoints.mjs';
 import { redTeamScan, redTeamQuestions, redTeamBlock } from './skills/redteam.mjs';
 import { groundClaims, groundingQuestions, groundingBlock } from './skills/grounding.mjs';
+import { recallRules, rulesAsConcerns, forge } from './flywheel.mjs';
+import { refineLoop, loopBlock } from './loop.mjs';
+import { ironLawQuestions } from './skills/ironlaws.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..');
@@ -34,6 +37,16 @@ export async function run(requirement, opts = {}) {
   const pref = prefs.recall(memoryPath);
   const { opts: o, applied } = prefs.apply(pref, opts);
   const resolutions = parseResolutions(o.resolve);
+
+  // ── learning flywheel: a human rejection forges a learned rule the next run re-checks ──
+  if (o.reject) {
+    for (const rj of (Array.isArray(o.reject) ? o.reject : [o.reject])) {
+      const i = String(rj).indexOf(':');
+      forge(memoryPath, { node: i > 0 ? String(rj).slice(0, i).trim() : 'review', reason: i > 0 ? String(rj).slice(i + 1).trim() : String(rj).trim() });
+    }
+  }
+  const learnedRules = recallRules(memoryPath);
+
   const intent = captureIntent(requirementText, o);
 
   const intk = intake(requirementText, o);
@@ -64,9 +77,10 @@ export async function run(requirement, opts = {}) {
   tick('context', CONDUCTOR.name, mem.contextFacts + JSON.stringify(pref), a2, wa('02-context.md', a2));
   log(`[2/9] ${c.cyan('CONTEXT')}   ${c.dim(CONDUCTOR.name)}  → ${mem.priorRuns} prior run(s) · ${pref.count} preference(s)`);
 
-  // 3 ANALYZE
+  // 3 ANALYZE (learned rules from past rejections become extra concerns — empty on a fresh memory)
   const concerns = mission.concerns(requirementText);
-  const ana = analyze(intk, concerns);
+  const concernsPlus = learnedRules.length ? [...concerns, ...rulesAsConcerns(learnedRules)] : concerns;
+  const ana = analyze(intk, concernsPlus);
   const a3 = `# 03 · Analysis\n\n## Sub-requirements\n- ${ana.subRequirements.join('\n- ') || '(single)'}\n\n## Concerns to verify (${mission.name})\n- ${ana.concerns.join('\n- ')}\n\n## Constraints\n- ${ana.constraints.join('\n- ')}\n\n## Assumptions (honest)\n- ${ana.assumptions.join('\n- ')}\n`;
   tick('analyze', stageOwnerName(mission, 'plan'), requirementText, a3, wa('03-analysis.md', a3));
   log(`[3/9] ${c.cyan('ANALYZE')}   ${c.dim(stageOwnerName(mission, 'plan'))}  → ${ana.subRequirements.length} sub-reqs · ${ana.concerns.length} concerns`);
@@ -107,6 +121,26 @@ export async function run(requirement, opts = {}) {
   tick('develop', stageOwnerName(mission, 'produce'), brief.subRequirements.join(','), pr.text, pr.out);
   log(`[7/9] ${c.cyan('PRODUCE')}   ${c.dim(stageOwnerName(mission, 'produce'))}  → ${pr.summary}`);
 
+  // 7b INNER LOOP (v0.6) — OPT-IN (--loop). Refine the produced artifact in a deterministic
+  // produce→verify→(rollback) loop BEFORE review sees it: severity gate + overshoot rollback +
+  // iron-law hard-halt + budget fuse, with a WHAT/WHY/PATTERN audit trail. Off by default, so the
+  // meter stays nine stages and the verdict is byte-stable. A crossed red line opens a checkpoint
+  // (only created here), so the loop still never bypasses the human.
+  let refined = null, loopRes = null, cpIron = null;
+  if (o.loop) {
+    const seed = ctx._produced || pr.text || requirementText;
+    loopRes = refineLoop({ artifact: seed, mission, intent, learnedRules, maxIter: o.loopMax ? Number(o.loopMax) : 6, target: o.target != null ? Number(o.target) : 8 });
+    refined = loopRes.best.artifact;
+    ctx._produced = refined;
+    const lb = loopBlock(loopRes);
+    tick('loop', stageOwnerName(mission, 'review'), seed, lb, wa('07b-loop.md', lb));
+    log(`  ${loopRes.ironLaw.crossed ? c.gold('◆ LOOP') : c.green('◇ LOOP')}     ${c.dim(stageOwnerName(mission, 'review'))}  → ${loopRes.exitReason.toUpperCase()} · sev ${loopRes.startScore}→${loopRes.endScore} · ${loopRes.iterations} iter${loopRes.rolledBack ? ' · rolled back' : ''}`);
+    if (loopRes.ironLaw.crossed) {
+      cpIron = makeCheckpoint('ironlaw', 'Iron law — red line crossed', 'in-loop', { questions: ironLawQuestions(loopRes.ironLaw), assessment: lb, resolution: resolutions.ironlaw });
+      wa('c-ironlaw-checkpoint.md', lb);
+    }
+  }
+
   // 8 REVIEW / QA
   const rv = mission.review(brief, ctx);
   tick('qa', stageOwnerName(mission, 'review'), brief.requirement, rv.text, rv.out);
@@ -115,7 +149,7 @@ export async function run(requirement, opts = {}) {
   // 8b RED TEAM + CLAIM GROUNDING (v0.5) — additive, report-only by default. Both are pure
   // deterministic passes (~0 token). They write a report artifact and never change the
   // shippable verdict unless --strict is set (then critical/contradicted feed a checkpoint).
-  const rtArtifact = ctx._produced || pr.text || requirementText;
+  const rtArtifact = refined || ctx._produced || pr.text || requirementText;
   const rt = redTeamScan(rtArtifact, { mission, intent });
   const gr = groundClaims(rtArtifact, { mission, intent });
   wa('08b-redteam-grounding.md', `# 08b · Red team + claim grounding\n\n_${o.strict ? 'STRICT — critical findings + contradicted claims must be resolved at the red-team checkpoint.' : 'Report-only (default) — surfaced for your judgment; does not change the verdict. Run with --strict to gate on critical findings.'}_\n` + redTeamBlock(rt) + groundingBlock(gr));
@@ -128,7 +162,7 @@ export async function run(requirement, opts = {}) {
 
   // CP2 · TRUST & GLOBAL — should you trust it, and does the local optimum serve the goal?
   const sig = {
-    text: pr.text || ctx._produced || requirementText,
+    text: refined || pr.text || ctx._produced || requirementText,
     provenance: (engine.wired || (r.sources && r.sources.length)) ? 'derived' : 'inferred',
     verified: (mission.build === 'eds-mcp' && engine.wired) || (cf.count > 0),
     testsScaffolded: cf.count || 0, reviewIssues: rv.issues || 0,
@@ -149,7 +183,7 @@ export async function run(requirement, opts = {}) {
     : null;
   if (cp3) wa('c3-redteam-checkpoint.md', cp3.assessment + (cp3.questions.length ? `\n## Open questions\n${cp3.questions.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n` : '\n_Cleared — no critical finding / contradiction._\n'));
 
-  const checkpoints = cp3 ? [cp1, cp2, cp3] : [cp1, cp2];
+  const checkpoints = [cp1, cp2, ...(cp3 ? [cp3] : []), ...(cpIron ? [cpIron] : [])];
   const shippable = allCleared(gates) && allCheckpointsCleared(checkpoints);
   const a10 = `# 10 · Certification\n\n- Mission: **${mission.name}**\n- Conformance / checklist: ${cf.summary}\n- Trust: **${ta.trust.level}** (${ta.trust.score}/100) · Substance: **${ta.substance.verdict}** (${ta.substance.substanceScore}/100)\n- Review issues: ${rv.issues || 0}\n- Research coverage: ${r.coverage}%\n\n## Gates\n${gates.map((g) => '- ' + gateLine(g)).join('\n')}\n\n## Deliberation checkpoints\n${checkpoints.map((cp) => '- ' + checkpointLine(cp)).join('\n')}\n\n## Verdict\n**${shippable ? 'SHIPPABLE — gates cleared, deliberation closed.' : 'NOT YET SHIPPABLE — ' + (openCheckpoints(checkpoints).length ? openCheckpoints(checkpoints).length + ' open checkpoint(s) need your judgment; ' : '') + 'gate(s)/checkpoint(s) pending. The harness does not bypass them.'}**\n\n_What the ${mission.name} squad did: intake, analysis, sourced research, plan, produce, review — and surfaced the trust + global-coherence questions. What stays human: the judgment, the two checkpoints, and the two gates._\n`;
   tick('certify', stageOwnerName(mission, 'certify'), String(cf.count), a10, wa('10-certification.md', a10));
@@ -174,7 +208,9 @@ export async function run(requirement, opts = {}) {
   log(`I/O (est):  ${c.bold(fmt(totals.totIn))} in / ${c.bold(fmt(totals.totOut))} out`);
   log(`Verdict:    ${shippable ? c.green('SHIPPABLE') : c.gold(oq.length ? 'IN DELIBERATION — ' + oq.length + ' open question(s)' : 'gates pending — not bypassed')}`);
 
-  return { slug: intk.slug, outDir, mission: mission.id, missionName: mission.name, squad: mission.squad.map((s) => s.name), domain: intk.domain, jurisdiction: intk.jurisdiction, jurisdictionName: intk.jurisdictionName, concerns: ana.concerns, coveragePct: r.coverage, conflicts: r.conflicts, findings: r.findings, gates, checkpoints, openQuestions: oq, inDeliberation: oq.length > 0, trust: ta.trust, substance: ta.substance, coherence: ta.coherence, intentStated: intent.stated, redteam: { counts: rt.counts, findings: rt.findings.length, block: rt.block }, grounding: gr.counts, strict: !!o.strict, shippable, meter, totals, wired: !!engine.wired, priorRuns: mem.priorRuns, prefsApplied: applied, prefsCount: pref.count };
+  return { slug: intk.slug, outDir, mission: mission.id, missionName: mission.name, squad: mission.squad.map((s) => s.name), domain: intk.domain, jurisdiction: intk.jurisdiction, jurisdictionName: intk.jurisdictionName, concerns: ana.concerns, coveragePct: r.coverage, conflicts: r.conflicts, findings: r.findings, gates, checkpoints, openQuestions: oq, inDeliberation: oq.length > 0, trust: ta.trust, substance: ta.substance, coherence: ta.coherence, intentStated: intent.stated, redteam: { counts: rt.counts, findings: rt.findings.length, block: rt.block }, grounding: gr.counts, strict: !!o.strict, shippable, meter, totals, wired: !!engine.wired, priorRuns: mem.priorRuns, prefsApplied: applied, prefsCount: pref.count,
+    loop: loopRes ? { exitReason: loopRes.exitReason, startScore: loopRes.startScore, endScore: loopRes.endScore, iterations: loopRes.iterations, rolledBack: loopRes.rolledBack, ironLawCrossed: loopRes.ironLaw.crossed } : null,
+    learnedRules: learnedRules.length };
 }
 
 export { prefs };

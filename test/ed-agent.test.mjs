@@ -8,6 +8,9 @@ import { captureIntent } from '../src/skills/trust.mjs';
 import { redTeamScan, redTeamQuestions } from '../src/skills/redteam.mjs';
 import { groundClaims } from '../src/skills/grounding.mjs';
 import { auditArtifact } from '../src/deliberate.mjs';
+import { refineLoop, severity } from '../src/loop.mjs';
+import { checkIronLaws } from '../src/skills/ironlaws.mjs';
+import { forge, recallRules, ruleHits } from '../src/flywheel.mjs';
 import { existsSync, readFileSync, rmSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -27,8 +30,8 @@ ok(detectMission('優化這段文案並去AI化').id === 'optimize', 'Chinese op
 ok(detectMission('anything', 'marketing').id === 'marketing', 'explicit --mission overrides detection');
 
 console.log('\nquality disciplines (pure)');
-const aiy = 'In conclusion, our world-class platform will seamlessly leverage cutting-edge synergy. 總之，這個方案能賦能企業。';
-ok(aiToneScan(aiy).reduce((a, h) => a + h.count, 0) >= 5, 'aiToneScan flags EN + 中文 filler');
+const aiy = 'In conclusion, our world-class platform will seamlessly leverage cutting-edge synergy. まさにシームレスで革新的なソリューション。總之，這個方案能賦能企業。';
+ok(aiToneScan(aiy).reduce((a, h) => a + h.count, 0) >= 5 && aiToneScan(aiy).some((h) => h.lang === 'ja') && aiToneScan(aiy).some((h) => h.lang === 'zh'), 'aiToneScan flags EN + JA + ZH filler');
 const sBad = blindScore(aiy), sGood = blindScore('The redesign cut KYC drop-off from 73% to 45% (GA4, n=12,847), saving each analyst 1.5 days per screen.');
 ok(sBad.dims.length === 5 && sBad.overall < 60 && verdict(sBad).label === 'REWORK', 'weak content → REWORK with 5 scored dims');
 ok(sGood.overall >= 70 && verdict(sGood).label === 'PASS', 'quantified content → PASS');
@@ -56,7 +59,7 @@ console.log('\noptimize squad — diagnose, debate (eds-mcp-quantified), de-AI, 
 const opt = await run('In conclusion, our world-class KYC onboarding will seamlessly leverage cutting-edge tech to improve the experience and unlock value under ASIC rules in Australia.', { outDir: join(tmp, 'opt'), memoryPath: mem, quiet: true });
 ok(opt.mission === 'optimize' && opt.squad.some((s) => /Reviewer B/.test(s)), 'optimize squad assembled');
 ok(opt.conflicts >= 5 && opt.shippable === false, 'AI-tone tells flagged · gates pending (not bypassed)');
-ok(existsSync(join(tmp, 'opt', '09-final-output.md')) && readFileSync(join(tmp, 'opt', '09-final-output.md'), 'utf8').includes('【專家診斷回饋】'), 'optimize writes the three-part output');
+ok(existsSync(join(tmp, 'opt', '09-final-output.md')) && readFileSync(join(tmp, 'opt', '09-final-output.md'), 'utf8').includes('Expert diagnostic / 専門家による診断'), 'optimize writes the three-part output (EN + JA)');
 ok(/KycStepper/.test(readFileSync(join(tmp, 'opt', '06-plan.md'), 'utf8')), 'Data officer quantifies the regulated surface against eds-mcp');
 
 console.log('\ngates + deliberation cleared → shippable');
@@ -126,6 +129,42 @@ ok(strictBlocked.checkpoints.some((c) => c.id === 'redteam' && c.status === 'ope
 const strictResolved = await run('Add a payment retry flow and migrate the payments schema', { ...rOpts, strict: true, resolve: ['trust: ok', 'redteam: accepted — conscious trade-off'], outDir: join(tmp, 'sr'), memoryPath: smem });
 ok(strictResolved.shippable === true, '--strict + --resolve "redteam: …": the human consciously accepts → shippable (proposes, never disposes)');
 
+console.log('\nv0.6 inner loop — produce → verify → (rollback), deterministic ~0 token');
+const messy = '# Build\nIn conclusion, our world-class seamless platform leverages cutting-edge synergy.\nconst apiKey = "sk-live-abc123def456";\ntry { charge() } catch (e) {}\nValidate input per OWASP ASVS V5.';
+const lr = refineLoop({ artifact: messy, mission: { id: 'code' }, intent: captureIntent(messy, {}), maxIter: 8, target: 6 });
+ok(lr.startScore > lr.endScore, 'loop converges — severity drops from start toward the deterministic floor');
+ok(lr.trace.length >= 2 && lr.trace.every((t) => 'what' in t && 'why' in t && 'pattern' in t), 'every iteration writes a WHAT/WHY/PATTERN audit line');
+ok(lr.exitReason !== 'iron-law' && Array.isArray(lr.residual.findings), 'residual is surfaced (escalated), not faked');
+
+let osc = 0;
+const oscillate = (a) => (osc++ === 0 ? a + '\nmore world-class best-in-class noise' : a + '\nconst secret = "sk-live-zzzzzz999999";');
+const rb = refineLoop({ artifact: 'A clean baseline statement about the work and its result.', mission: { id: 'code' }, intent: captureIntent('x', {}), produce: oscillate, maxIter: 6, target: 0, patience: 2 });
+ok(rb.exitReason === 'overshoot-rollback' && rb.rolledBack === true, 'a regressing producer triggers overshoot rollback (the safety valve for a non-deterministic producer)');
+ok(rb.best.score <= Math.max(...rb.severityHistory), 'the shipped artifact is the best-severity version, never the regressed one');
+
+const il = refineLoop({ artifact: 'Add a step to bypass the KYC check and auto-execute the fund transfer.', mission: { id: 'finance' }, intent: captureIntent('x', {}), maxIter: 6 });
+ok(il.exitReason === 'iron-law' && il.ironLaw.crossed && il.ironLaw.trips.length >= 1, 'a crossed red line HARD-HALTS the loop (iron law) — not a judgment call');
+ok(checkIronLaws('The pipeline will auto-approve and bypass the human sign-off.', 'code').trips.some((t) => t.id === 'no-self-authority'), 'universal iron law: no self-authority / gate bypass');
+ok(checkIronLaws('Add a KYC step that shows the legal basis inline.', 'finance').crossed === false, 'iron laws do not false-positive on a normal compliant requirement');
+ok(severity(messy, { mission: { id: 'code' } }).score > severity('The redesign cut KYC drop-off from 73% to 45% (GA4, n=12847) per the funnel study.', { mission: { id: 'code' } }).score, 'severity scores a messy artifact worse than a clean, sourced one');
+
+console.log('\nv0.6 --loop in the pipeline — opt-in, default byte-stable');
+const lmem = join(tmp, 'loop-mem.md');
+const noLoop = await run('Build a backend API with input validation and error handling', { outDir: join(tmp, 'nl'), memoryPath: lmem, quiet: true });
+ok(noLoop.meter.length === 9 && noLoop.checkpoints.map((c) => c.id).join(',') === 'frame,trust' && noLoop.loop === null, 'default (no --loop): meter stays 9 stages · checkpoints frame,trust · loop off (byte-stable)');
+const withLoop = await run('Build a backend API with input validation and error handling', { loop: true, outDir: join(tmp, 'wl'), memoryPath: lmem, quiet: true });
+ok(withLoop.meter.length === 10 && existsSync(join(tmp, 'wl', '07b-loop.md')) && !!withLoop.loop && !!withLoop.loop.exitReason, '--loop: adds the loop stage + writes 07b-loop.md + reports the exit reason');
+ok(withLoop.loop.startScore >= withLoop.loop.endScore, '--loop never ships a worse artifact than it started with');
+
+console.log('\nv0.6 flywheel — a rejection forges a learned rule the next run re-checks');
+const fmem = join(tmp, 'fly-mem.md');
+forge(fmem, { node: 'trust', reason: 'violates MiFID II best execution' });
+const frules = recallRules(fmem);
+ok(frules.length === 1 && frules[0].kind === 'regulation' && /MiFID/i.test(frules[0].pattern), 'forge extracts the regulation token as the trigger + keeps the reason');
+ok(ruleHits('This order routing ignores MiFID II best execution.', frules).length === 1, 'ruleHits re-detects the learned pattern on a later artifact');
+const injected = await run('Design an order routing screen for best execution', { mission: 'finance', outDir: join(tmp, 'inj'), memoryPath: fmem, quiet: true });
+ok(injected.learnedRules === 1 && readFileSync(join(tmp, 'inj', '03-analysis.md'), 'utf8').includes('Learned rule'), 'the learned rule is injected into the next run as an analysis concern');
+
 rmSync(tmp, { recursive: true, force: true });
-console.log(fails === 0 ? '\nPASS — squads swap, skills produce, memory learns, gates hold, red team + grounding run report-only.' : `\nFAIL — ${fails} check(s) failed.`);
+console.log(fails === 0 ? '\nPASS — squads swap, skills produce, memory learns, gates hold, red team + grounding run report-only, the inner loop self-corrects with rollback + iron-law halt, the flywheel learns.' : `\nFAIL — ${fails} check(s) failed.`);
 process.exit(fails === 0 ? 0 : 1);

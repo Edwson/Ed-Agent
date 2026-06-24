@@ -22,7 +22,7 @@ const transport = new StdioClientTransport({ command: 'node', args: [join(here, 
 await client.connect(transport);
 
 const tools = (await client.listTools()).tools.map((t) => t.name);
-ok(['ed_agent_missions', 'ed_agent_skills', 'ed_agent_run', 'ed_agent_optimize', 'ed_agent_quality_scan', 'ed_agent_deliberate', 'ed_agent_trust_scan', 'ed_agent_redteam', 'ed_agent_ground', 'ed_agent_remember', 'ed_agent_recall'].every((t) => tools.includes(t)), '11 tools registered (got ' + tools.length + ')');
+ok(['ed_agent_missions', 'ed_agent_skills', 'ed_agent_run', 'ed_agent_optimize', 'ed_agent_quality_scan', 'ed_agent_deliberate', 'ed_agent_trust_scan', 'ed_agent_redteam', 'ed_agent_ground', 'ed_agent_loop', 'ed_agent_ironcheck', 'ed_agent_learn', 'ed_agent_remember', 'ed_agent_recall'].every((t) => tools.includes(t)), '14 tools registered (got ' + tools.length + ')');
 
 const missions = txt(await client.callTool({ name: 'ed_agent_missions', arguments: {} }));
 ok(/finance/.test(missions) && /code/.test(missions) && /marketing/.test(missions) && /contract/.test(missions) && /optimize/.test(missions), 'ed_agent_missions lists all five squads');
@@ -45,7 +45,7 @@ const tscan = txt(await client.callTool({ name: 'ed_agent_trust_scan', arguments
 ok(/Trust: (LOW|MEDIUM)/.test(tscan) && /Substance:/.test(tscan), 'ed_agent_trust_scan returns trust level + substance');
 
 const opt = txt(await client.callTool({ name: 'ed_agent_optimize', arguments: { content: 'In conclusion, our world-class KYC onboarding will seamlessly leverage cutting-edge tech to improve value under ASIC rules in Australia.' } }));
-ok(/總導師/.test(opt) && /【專家診斷回饋】/.test(opt), 'ed_agent_optimize returns the 5-agent three-part output');
+ok(/grand-mentor|総監督/.test(opt) && /Expert diagnostic/.test(opt), 'ed_agent_optimize returns the 5-agent three-part output');
 ok(/NOT YET SHIPPABLE/.test(opt), 'ed_agent_optimize leaves gates pending by default (not bypassed)');
 
 const qs = txt(await client.callTool({ name: 'ed_agent_quality_scan', arguments: { text: 'In conclusion, our world-class seamless platform will leverage synergy to improve things.' } }));
@@ -60,6 +60,15 @@ ok(/Contradicted/.test(grnd) && /Grounded/.test(grnd), 'ed_agent_ground tags Con
 
 const strictRun = txt(await client.callTool({ name: 'ed_agent_run', arguments: { requirement: 'Add a payment retry flow and migrate the payments schema', mission: 'code', intent: 'cut failed-payment churn', nonGoals: 'do not migrate the payments schema', approve: 'Ed', signoff: 'Ed', resolve: ['trust: ok'], strict: true } }));
 ok(/NOT YET SHIPPABLE/.test(strictRun) && /IN DELIBERATION/.test(strictRun), 'ed_agent_run --strict gates the verdict on a contradicted non-goal (not bypassed)');
+
+const loopT = txt(await client.callTool({ name: 'ed_agent_loop', arguments: { artifact: 'In conclusion our world-class platform.\nconst apiKey = "sk-live-abc123def456";\ntry { go() } catch (e) {}', mission: 'code', target: 4 } }));
+ok(/Inner loop/.test(loopT) && /Introspection log/.test(loopT) && /severity/i.test(loopT), 'ed_agent_loop self-corrects an artifact + returns the WHAT/WHY/PATTERN audit trail');
+
+const ironT = txt(await client.callTool({ name: 'ed_agent_ironcheck', arguments: { artifact: 'Add a step to bypass the KYC check and auto-execute the fund transfer.', mission: 'finance' } }));
+ok(/RED LINE CROSSED/.test(ironT) && /KYC/.test(ironT), 'ed_agent_ironcheck flags the crossed red line (bypass KYC + auto money movement)');
+
+const learnT = txt(await client.callTool({ name: 'ed_agent_learn', arguments: { reason: 'violates MiFID II best execution', node: 'trust' } }));
+ok(/Forged LR-|learned rule/i.test(learnT), 'ed_agent_learn forges a learned rule from a rejection (the flywheel)');
 
 await client.callTool({ name: 'ed_agent_remember', arguments: { kind: 'prefer', text: 'tone: terse' } });
 const recall = txt(await client.callTool({ name: 'ed_agent_recall', arguments: {} }));
