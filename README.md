@@ -47,7 +47,7 @@ node bin/ed-agent.mjs "KYC onboarding with EDD source of funds"                 
 node bin/ed-agent.mjs --mission optimize --input case-study.md                    # → optimize squad (review)
 ```
 
-## Quickstart · 使用指南
+## Quickstart · ユーザーガイド
 
 **No install, no dependencies.** The core is pure Node (18+). Get the code, run one command, then watch it in the dashboard.
 
