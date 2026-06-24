@@ -1,6 +1,6 @@
 {
   "name": "ed-agent",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Ed Agent — a mission-swappable one-person army for build, review AND trust, now with an inner self-correction loop. One requirement (or any content) drives a nine-stage lifecycle with two deliberation checkpoints where it STOPS and surfaces the questions only a human can answer. v0.6 adds the loop (opt-in --loop): the produced artifact is refined in a deterministic produce→verify→(rollback) inner loop with four safety mechanisms — a severity gate, an overshoot rollback (discard a regressed version), iron-law HARD-HALTS (crossed red lines never bypass the human), and a budget fuse against runaway loops — plus a WHAT/WHY/PATTERN audit trail and a learning flywheel that forges a durable rule from every human rejection. Every build also runs a mission-aware red team and claim-level grounding (report-only by default, --strict to gate). Squads swap by domain (code · marketing · contract · regulated-finance · optimize/總導師). Point it at a diff to ask 'should I trust this?', or at any artifact with --refine to watch it self-correct. Drop it into any bot via MCP (14 tools) or the AGENTS.md brief. Zero-dependency core; the model produces, the harness governs.",
   "type": "module",
   "bin": {

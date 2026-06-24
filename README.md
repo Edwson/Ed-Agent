@@ -47,6 +47,44 @@ node bin/ed-agent.mjs "KYC onboarding with EDD source of funds"                 
 node bin/ed-agent.mjs --mission optimize --input case-study.md                    # → optimize squad (review)
 ```
 
+## Quickstart · 使用指南
+
+**No install, no dependencies.** The core is pure Node (18+). Get the code, run one command, then watch it in the dashboard.
+
+```bash
+# 1 · get it
+git clone https://github.com/Edwson/Ed-Agent.git && cd Ed-Agent
+
+# 2 · run a requirement through the governed lifecycle
+#     --intent captures the business goal · --approve / --signoff are the two human gates
+node bin/ed-agent.mjs "KYC onboarding with EDD source of funds" \
+  --intent "let compliant clients finish onboarding" --approve "You" --signoff "You"
+
+# 3 · open the control room to watch + tune it — no command line needed after this
+node bin/ed-agent.mjs dashboard --open        # → http://127.0.0.1:4317
+```
+
+A run writes real artifacts to `out/` and a quantified entry to **`Ed_agents_Claude.md`** (its memory). The dashboard reads that *same* file — it is the single source of truth, and nothing leaves your machine (the server binds to `127.0.0.1` only and makes zero external requests).
+
+### Command cheat-sheet
+
+> `ed-agent` below is shorthand for `node bin/ed-agent.mjs` (run `npm link` once to get the real `ed-agent` command).
+
+| You want to… | Command |
+|---|---|
+| Build / plan something | `ed-agent "your requirement"`  *(mission auto-detected)* |
+| Force a squad | `ed-agent "…" --mission code\|marketing\|contract\|finance\|optimize` |
+| Review / de-AI any content | `ed-agent --mission optimize --input file.md` |
+| Audit a diff — *"should I trust this?"* | `ed-agent --audit changes.diff --intent "…" --not "a non-goal"` |
+| Run the self-correcting inner loop | `ed-agent "…" --loop`  *(severity gate · rollback · iron-laws · budget fuse)* |
+| Gate on critical red-team findings | `ed-agent "…" --strict` |
+| Resolve an open checkpoint | `--resolve "trust: accepted"`  /  `--resolve "ironlaw: reason"` |
+| Teach it a preference | `ed-agent --remember --prefer "tone: terse"` |
+| Open the control room | `ed-agent dashboard --open` |
+| Run every test | `npm test && npm run test:dashboard && npm run test:mcp` |
+
+Want it inside Claude / Cursor / Codex instead of the terminal? Drop it in via the **[MCP server](#drop-it-into-any-bot)** or the plain-text **[`AGENTS.md`](./AGENTS.md)** brief.
+
 ## The squad swaps to the mission
 
 The mission is auto-detected from the requirement (override with `--mission`):
