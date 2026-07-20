@@ -3,6 +3,7 @@
 import { decompose, crossCompare, renderFindings } from '../skills/logic.mjs';
 import { qualityBlock } from '../skills/quality.mjs';
 import { uniq } from '../util.mjs';
+import { routeSkills } from '../skillrouter.mjs';
 
 const KB = [
   { group: 'Persuasion principles', source: 'Cialdini', ref: 'Influence', claim: 'Reciprocity, commitment, social proof, authority, liking and scarcity drive a decision — use them honestly.' },
@@ -12,6 +13,9 @@ const KB = [
   { group: 'Measurement', source: 'Google Analytics', ref: 'GA4 funnels', claim: 'Define the funnel and the conversion event before launch, not after.' },
   { group: 'Claim compliance', source: 'FTC', ref: 'Endorsement Guides', claim: 'Every performance or testimonial claim must be substantiated and disclosed.' },
   { group: 'Audience clarity', source: 'JTBD', ref: 'Jobs to be Done', claim: 'People hire a product for a job; segment by the job, not by demographics alone.' },
+  { group: 'Generative-engine optimization', source: 'GEO practice', ref: '2026 AI search', claim: 'AI answer engines cite what they can attribute: publish clear, quotable claims with sources, an entity graph, and structured data — being found now means being cited by an AI, not only ranked by a crawler.' },
+  { group: 'Retention', source: 'Reichheld / Bain', ref: 'loyalty economics', claim: 'Retention compounds: a small lift in repeat rate moves LTV more than an equal lift in acquisition — measure the returning cohort, not just the first purchase.' },
+  { group: 'Brand consistency', source: 'practice', ref: 'positioning', claim: 'One proposition, said the same way across every surface — inconsistency reads as untrustworthy long before the copy is bad.' },
   { group: 'Channel fit', source: 'benchmark report', ref: 'industry (UNVERIFIED)', claim: 'Paid social always beats SEO for early-stage SaaS.' },
 ];
 const CONCERN_RE = [
@@ -20,6 +24,8 @@ const CONCERN_RE = [
   [/\b(funnel|signup|checkout|form|onboard|conver)\b/i, 'Funnel friction'],
   [/\b(channel|seo|social|email|ad|paid|organic)\b/i, 'Channel fit'],
   [/\b(track|measure|analytic|metric|kpi)\b/i, 'Measurement'],
+  [/\b(geo|generative|answer engine|llm|cited)\b/i, 'Generative-engine optimization'],
+  [/\b(retention|churn|repeat|loyalty|ltv|lifecycle)\b/i, 'Retention'],
   [/\b(claim|testimonial|guarantee|result|roi)\b/i, 'Claim compliance'],
 ];
 
@@ -32,7 +38,7 @@ export const marketing = {
     { id: 'creative', name: 'Creative Director', role: 'Concept & message', one: 'Owns the single-minded proposition, tone and hero message.' },
     { id: 'conversion', name: 'Conversion Analyst', role: 'Funnel math', one: 'Models the funnel and the conversion economics — honestly labelled assumptions.' },
     { id: 'psych', name: 'Consumer Psychologist', role: 'Behavioural lens', one: 'Applies persuasion principles ethically; flags dark patterns.' },
-    { id: 'seo', name: 'SEO', role: 'Discoverability', one: 'Keyword clusters + on-page plan so the page is found.' },
+    { id: 'seo', name: 'SEO & GEO', role: 'Discoverability', one: 'Keyword clusters + on-page plan so the page is found by search — and quotable, sourced claims + structured data so it is cited by 2026 AI answer engines (GEO).' },
   ],
   stageOwners: { research: 'psych', plan: 'creative', produce: 'conversion', review: 'psych', certify: 'creative' },
 
@@ -51,8 +57,14 @@ export const marketing = {
 
   plan(brief, ctx) {
     const md = `# 06 · Creative brief (Creative Director)\n\n- **Objective:** ${brief.requirement}\n- **Audience:** the job-to-be-done behind the requirement (segment by job, not demographics alone)\n- **Single-minded proposition:** one promise the page must land\n- **Tone:** confident, specific, claim-substantiated\n- **Hero message:** answer what / for whom / why-now in the first viewport\n- **Channels (hypothesis):** test ≥2, measure, double down on the winner\n\n> Creative judgment stays human — the Director proposes; the operator approves at the gate.\n`;
-    const out = ctx.wa('06-plan.md', md);
-    return { text: md, out, summary: 'creative brief drafted' };
+    let methods = '';
+    try {
+      const hits = routeSkills(brief.requirement, { mission: 'marketing', limit: 4 });
+      if (hits.length) methods = `\n## Methods to load (from the skill library — the harness suggests, the operator chooses)\n${hits.map((h) => `- **${h.name}** (\`${h.id}\`) — \`${h.path}\``).join('\n')}\n\n> Suggestions from a deterministic keyword router over \`src/skills/*.md\`; nothing runs automatically.\n`;
+    } catch { /* library optional */ }
+    const full = md + methods;
+    const out = ctx.wa('06-plan.md', full);
+    return { text: full, out, summary: 'creative brief drafted' + (methods ? ' + methods routed' : '') };
   },
 
   produce(brief, ctx) {
