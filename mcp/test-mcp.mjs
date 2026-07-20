@@ -22,7 +22,7 @@ const transport = new StdioClientTransport({ command: 'node', args: [join(here, 
 await client.connect(transport);
 
 const tools = (await client.listTools()).tools.map((t) => t.name);
-ok(['ed_agent_missions', 'ed_agent_skills', 'ed_agent_run', 'ed_agent_optimize', 'ed_agent_quality_scan', 'ed_agent_deliberate', 'ed_agent_trust_scan', 'ed_agent_redteam', 'ed_agent_ground', 'ed_agent_loop', 'ed_agent_ironcheck', 'ed_agent_learn', 'ed_agent_remember', 'ed_agent_recall'].every((t) => tools.includes(t)), '14 tools registered (got ' + tools.length + ')');
+ok(['ed_agent_missions', 'ed_agent_skills', 'ed_agent_run', 'ed_agent_optimize', 'ed_agent_quality_scan', 'ed_agent_deliberate', 'ed_agent_trust_scan', 'ed_agent_redteam', 'ed_agent_ground', 'ed_agent_loop', 'ed_agent_ironcheck', 'ed_agent_learn', 'ed_agent_remember', 'ed_agent_recall', 'ed_agent_route_skills'].every((t) => tools.includes(t)), '15 tools registered (got ' + tools.length + ')');
 
 const missions = txt(await client.callTool({ name: 'ed_agent_missions', arguments: {} }));
 ok(/finance/.test(missions) && /code/.test(missions) && /marketing/.test(missions) && /contract/.test(missions) && /optimize/.test(missions), 'ed_agent_missions lists all five squads');
@@ -73,6 +73,9 @@ ok(/Forged LR-|learned rule/i.test(learnT), 'ed_agent_learn forges a learned rul
 await client.callTool({ name: 'ed_agent_remember', arguments: { kind: 'prefer', text: 'tone: terse' } });
 const recall = txt(await client.callTool({ name: 'ed_agent_recall', arguments: {} }));
 ok(/terse/.test(recall), 'ed_agent_remember → ed_agent_recall round-trips a preference');
+
+const routeT = txt(await client.callTool({ name: 'ed_agent_route_skills', arguments: { need: 'launch a marketing campaign, write a blog, improve SEO and GEO conversion', mission: 'marketing', limit: 4 } }));
+ok(/seo|blog|geo|marketing|growth|conversion/i.test(routeT), 'ed_agent_route_skills ranks the .md library and surfaces marketing methods for a marketing need');
 
 await client.close();
 console.log(fails === 0 ? '\nPASS — the live MCP server speaks the protocol; Ed Agent drops into any MCP host.' : `\nFAIL — ${fails} check(s).`);

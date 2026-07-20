@@ -16,6 +16,7 @@ import { auditArtifact } from '../src/deliberate.mjs';
 import { refineLoop, loopBlock } from '../src/loop.mjs';
 import { checkIronLaws, ironLawBlock } from '../src/skills/ironlaws.mjs';
 import { forge, recallRules } from '../src/flywheel.mjs';
+import { routeSkills, skillCatalog } from '../src/skillrouter.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
@@ -46,6 +47,23 @@ export function buildServer() {
     async () => text(['Stages: intake → context → analyze → research → ledger → plan → produce → review → certify (two human gates: plan-approval, certification sign-off).',
       'Two deliberation checkpoints: FRAME (after analyze — is the intent captured, or is the agent guessing the project?) and TRUST & global coherence (after review — should you trust it · does the local optimum serve the global goal · substance vs over-defensive ceremony?). A run stays IN DELIBERATION, not shippable, until the open questions are resolved.',
       ...MISSIONS.map((m) => `${m.name}: research=${m.stageOwners.research} · plan=${m.stageOwners.plan} · produce=${m.stageOwners.produce} · review=${m.stageOwners.review} · certify=${m.stageOwners.certify}`)].join('\n')));
+
+  server.registerTool('ed_agent_route_skills',
+    {
+      title: 'Route the skill library to a need',
+      description: 'Given a plain-English need, deterministically rank the .md skill-method library (src/skills/*.md) by relevance and return the top matches — id, name, path, and the words that matched — with an optional mission-affinity nudge. The harness routes; the human or agent decides which method(s) to load and follow. No model is called and nothing runs automatically; this only suggests which of the documented methods fit the job. Omit the need to get the full catalogue count.',
+      inputSchema: { need: z.string().optional(), mission: z.string().optional(), limit: z.number().optional() }
+    },
+    async (args) => {
+      const need = args && args.need ? String(args.need) : '';
+      if (!need) return text(`Skill library: ${skillCatalog().length} documented methods (src/skills/*.md). Supply a need to route, e.g. "launch a marketing campaign and improve SEO conversion".`);
+      const mission = args && args.mission ? String(args.mission).toLowerCase() : null;
+      const limit = args && args.limit ? Math.max(1, Math.min(20, args.limit | 0)) : 6;
+      const hits = routeSkills(need, { mission, limit });
+      if (!hits.length) return text(`No skill matched "${need}". Try different words.`);
+      const body = hits.map((h) => `- **${h.name}** (\`${h.id}\`) — score ${h.score}${h.why.length ? ' · matched: ' + h.why.join(', ') : ''}\n  ${h.path}\n  ${h.description}`).join('\n');
+      return text(`# Skills for: "${need}"${mission ? ' · mission ' + mission : ''}\nThe harness ranks; you decide which to load. Nothing runs automatically.\n\n${body}`);
+    });
 
   server.registerTool('ed_agent_run',
     {
