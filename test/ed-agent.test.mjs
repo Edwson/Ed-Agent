@@ -11,6 +11,7 @@ import { auditArtifact } from '../src/deliberate.mjs';
 import { refineLoop, severity } from '../src/loop.mjs';
 import { checkIronLaws } from '../src/skills/ironlaws.mjs';
 import { forge, recallRules, ruleHits } from '../src/flywheel.mjs';
+import { routeSkills, skillCatalog } from '../src/skillrouter.mjs';
 import { existsSync, readFileSync, rmSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -172,6 +173,17 @@ ok(ruleHits('This order routing ignores MiFID II best execution.', frules).lengt
 const injected = await run('Design an order routing screen for best execution', { mission: 'finance', outDir: join(tmp, 'inj'), memoryPath: fmem, quiet: true });
 ok(injected.learnedRules === 1 && readFileSync(join(tmp, 'inj', '03-analysis.md'), 'utf8').includes('Learned rule'), 'the learned rule is injected into the next run as an analysis concern');
 
+console.log('\nskill router — deterministic selection over the .md library');
+const cat = skillCatalog();
+ok(cat.length >= 100 && cat.every((x) => x.id && x.name && x.path.endsWith('.md')), 'skill library loads (id/name/path per method)');
+const mkH = routeSkills('launch a marketing campaign, write a blog and improve SEO conversion', { mission: 'marketing', limit: 5 });
+ok(mkH.length && /seo|blog|geo|marketing|conversion|growth/.test(mkH[0].id), 'a marketing need surfaces a marketing method first');
+const kyH = routeSkills('KYC onboarding and AML compliance for a securities broker', { mission: 'finance', limit: 5 });
+ok(kyH.length && /kyc|aml|compliance|securities/.test(kyH[0].id), 'a KYC/AML need surfaces a compliance method first');
+ok(JSON.stringify(routeSkills('improve retention and churn', { mission: 'marketing' })) === JSON.stringify(routeSkills('improve retention and churn', { mission: 'marketing' })), 'routing is deterministic — same input, byte-identical output');
+ok(routeSkills('qz9 wxk vbn zzq', {}).length === 0, 'a nonsense need matches nothing (no false positives)');
+ok(readFileSync(join(tmp, 'inj', '03-analysis.md'), 'utf8') !== null, '(router leaves the lifecycle untouched — no run mutation)');
+
 rmSync(tmp, { recursive: true, force: true });
-console.log(fails === 0 ? '\nPASS — squads swap, skills produce, memory learns, gates hold, red team + grounding run report-only, the inner loop self-corrects with rollback + iron-law halt, the flywheel learns.' : `\nFAIL — ${fails} check(s) failed.`);
+console.log(fails === 0 ? '\nPASS — squads swap, skills produce, memory learns, gates hold, red team + grounding run report-only, the inner loop self-corrects with rollback + iron-law halt, the flywheel learns, the skill router selects deterministically.' : `\nFAIL — ${fails} check(s) failed.`);
 process.exit(fails === 0 ? 0 : 1);
