@@ -16,7 +16,7 @@ const root = join(here, '..');
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const memoryPath = join(root, 'Ed_agents_Claude.md');
 
-const VALUE_FLAGS = ['--jurisdiction', '--mission', '--approve', '--signoff', '--eds', '--out', '--input', '--intent', '--done', '--not', '--audit', '--refine', '--loop-max', '--target', '--port', '--mem', '--remember', '--prefer', '--like', '--dislike'];
+const VALUE_FLAGS = ['--jurisdiction', '--mission', '--approve', '--signoff', '--eds', '--out', '--input', '--intent', '--done', '--not', '--audit', '--refine', '--loop-max', '--target', '--port', '--mem', '--remember', '--prefer', '--like', '--dislike', '--limit'];
 const REPEATABLE = ['--resolve', '--reject'];
 const argv = process.argv.slice(2);
 const flags = {}; const words = [];
@@ -41,6 +41,27 @@ if (words[0] === 'dashboard') {
   start({ port: flags['--port'], memPath: flags['--mem'] || memoryPath, open: !!flags['--open'] });
 }
 
+// `ed-agent skills "<need>"` — deterministic skill router over the src/skills/*.md library.
+// Ranks the method files by relevance to a plain-English need (with an optional --mission
+// affinity nudge) and prints them. No model is called; the human/agent decides what to load.
+if (words[0] === 'skills') {
+  const { routeSkills, skillCatalog } = await import('../src/skillrouter.mjs');
+  const need = words.slice(1).join(' ');
+  const mission = flags['--mission'] ? String(flags['--mission']).toLowerCase() : null;
+  const limit = flags['--limit'] ? Math.max(1, parseInt(flags['--limit'], 10) || 6) : 6;
+  if (!need) {
+    const cat = skillCatalog();
+    console.log(`ed-agent skills — ${cat.length} methods in the library (src/skills/*.md).\n` +
+      `Give a need to route: ed-agent skills "launch a marketing campaign and improve SEO conversion" [--mission marketing] [--limit N]`);
+    process.exit(0);
+  }
+  const hits = routeSkills(need, { mission, limit });
+  if (!hits.length) { console.log('No skill matched — try different words, or `ed-agent skills` for the full catalogue.'); process.exit(0); }
+  console.log(`Skills for: "${need}"${mission ? ` · mission ${mission}` : ''}\nThe harness ranks; you decide which to load. Nothing runs automatically.\n`);
+  for (const s of hits) console.log(`  ${String(s.score).padStart(5)}  ${s.name}\n         ${s.path}${s.why.length ? '  · matched: ' + s.why.join(', ') : ''}`);
+  process.exit(0);
+}
+
 if (flags['--help'] || flags['-h']) {
   console.log(`ed-agent v${pkg.version} — one requirement → a mission-swapped, human-gated lifecycle
 
@@ -48,6 +69,7 @@ USAGE
   ed-agent "<requirement>" [options]
   ed-agent --remember "<idea>"            # teach it, without running
   ed-agent dashboard [--port N] [--mem <path>] [--open]   # open the local control room (127.0.0.1 only)
+  ed-agent skills "<need>" [--mission M] [--limit N]   # route the .md skill library to a need (no run)
 
 MISSIONS (auto-detected, or force with --mission)
   finance    regulated-finance design — drives the eds-mcp build engine
