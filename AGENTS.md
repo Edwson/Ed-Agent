@@ -17,10 +17,10 @@ There are two ways to plug in:
 }
 ```
 
-Tools the host gains (9): `ed_agent_run`, `ed_agent_deliberate` (audit any artifact/diff —
+Tools the host gains (10): `ed_agent_run`, `ed_agent_deliberate` (audit any artifact/diff —
 "should I trust this?"), `ed_agent_trust_scan` (fast trust + substance), `ed_agent_optimize`
 (review/optimize any content), `ed_agent_quality_scan`, `ed_agent_missions`, `ed_agent_skills`,
-`ed_agent_remember`, `ed_agent_recall`. (Run `npm install @modelcontextprotocol/sdk zod`
+`ed_agent_remember`, `ed_agent_recall`, `ed_agent_route_skills` (rank the 139-skill .md library to a need). (Run `npm install @modelcontextprotocol/sdk zod`
 once to enable the server; the CLI works without it.)
 
 **The host loop — drive the deliberation.** `ed_agent_run` / `ed_agent_deliberate` return the

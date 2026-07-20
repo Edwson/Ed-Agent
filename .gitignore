@@ -1,0 +1,15 @@
+# dependencies (there are none — this is zero-dependency)
+node_modules/
+
+# runtime output of `ed-agent` runs (a committed sample lives in examples/sample-run/)
+out/
+
+# OS noise
+.DS_Store
+*.log
+
+# build/archive artifacts
+*.zip
+
+# Claude Desktop extension build (shipped as a Release asset)
+ed-agent.mcpb

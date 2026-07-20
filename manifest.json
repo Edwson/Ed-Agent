@@ -1,0 +1,55 @@
+{
+  "manifest_version": "0.3",
+  "name": "ed-agent",
+  "display_name": "Ed Agent",
+  "version": "0.6.2",
+  "description": "A mission-swappable one-person army for build, review AND trust — nine-stage human-gated lifecycle, a self-correcting inner loop, and deterministic routing over a 139-skill library. The model produces; the harness governs.",
+  "long_description": "Ed Agent drops a governed AI operating model into any MCP host. One requirement (or any pasted content) drives a nine-stage lifecycle with two deliberation checkpoints where it STOPS and surfaces the questions only a human can answer. Squads swap by domain — code, marketing, contract, regulated-finance, and an optimize/總導師 review squad. Every build runs a mission-aware red team and claim-level grounding (report-only by default). Point it at a diff to ask \"should I trust this?\", or refine any artifact in a produce → verify → (rollback) inner loop with a severity gate, overshoot rollback, iron-law hard-halts, and a budget fuse. It also routes a plain-English need to the right method from a 139-skill Markdown library — the harness ranks, you decide. Zero-dependency core; nothing runs automatically and no red line is ever bypassed.",
+  "author": {
+    "name": "Ed Chen",
+    "url": "https://www.edwson.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Edwson/Ed-Agent.git"
+  },
+  "homepage": "https://github.com/Edwson/Ed-Agent",
+  "support": "https://github.com/Edwson/Ed-Agent/issues",
+  "icon": "img/ed_agent.png",
+  "license": "MIT",
+  "keywords": ["ai-agent", "multi-agent", "orchestration", "human-in-the-loop", "code-review", "red-team", "skill-router"],
+  "server": {
+    "type": "node",
+    "entry_point": "mcp/server.mjs",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/mcp/server.mjs"],
+      "env": {}
+    }
+  },
+  "tools_generated": false,
+  "tools": [
+    { "name": "ed_agent_missions", "description": "List the squads Ed Agent can become and what each produces." },
+    { "name": "ed_agent_skills", "description": "The nine-stage lifecycle and which squad member owns each stage." },
+    { "name": "ed_agent_route_skills", "description": "Rank the 139-skill .md library against a plain-English need and return the top methods to load." },
+    { "name": "ed_agent_run", "description": "Run the full nine-stage lifecycle on a requirement; stops at the human checkpoints." },
+    { "name": "ed_agent_optimize", "description": "Run the grand-mentor (總監督) five-agent review on existing content." },
+    { "name": "ed_agent_quality_scan", "description": "Blind quality score + verdict on any text (AI-tone, unquantified claims)." },
+    { "name": "ed_agent_deliberate", "description": "Audit any artifact or diff — \"should I trust this?\" — with open questions." },
+    { "name": "ed_agent_trust_scan", "description": "Fast trust + substance read on a piece of content." },
+    { "name": "ed_agent_redteam", "description": "Mission-aware adversarial scan of an artifact." },
+    { "name": "ed_agent_ground", "description": "Claim-level grounding: Grounded / Ungrounded / Contradicted." },
+    { "name": "ed_agent_loop", "description": "Self-correct an artifact: severity gate · overshoot rollback · iron-law halt + audit trail." },
+    { "name": "ed_agent_ironcheck", "description": "Scan an artifact for crossed red lines (hard-halt conditions)." },
+    { "name": "ed_agent_learn", "description": "Forge a durable learned rule from a human rejection (the flywheel)." },
+    { "name": "ed_agent_remember", "description": "Store a durable preference (tone, mission, jurisdiction)." },
+    { "name": "ed_agent_recall", "description": "Recall stored preferences and learned rules." }
+  ],
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

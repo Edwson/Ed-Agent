@@ -47,7 +47,7 @@ node bin/ed-agent.mjs "KYC onboarding with EDD source of funds"                 
 node bin/ed-agent.mjs --mission optimize --input case-study.md                    # → optimize squad (review)
 ```
 
-## Quickstart · ユーザーガイド
+## Quickstart · 使用指南
 
 **No install, no dependencies.** The core is pure Node (18+). Get the code, run one command, then watch it in the dashboard.
 
@@ -272,6 +272,38 @@ node bin/ed-agent.mjs --like "dense data tables"  --dislike "emoji in headings"
 It records likes, dislikes, preferences and concepts; recalls them at the **Context** stage;
 and applies the preferred mission / jurisdiction automatically.
 
+## The skill library — route the right method to the need
+
+Ed Agent carries a library of **139 domain skills** (`src/skills/*.md` — the same Markdown
+methods published on the portfolio). Given a need, it **deterministically ranks** the library
+by keyword/token overlap (name + id weighted, description + audience folded in) with a small
+mission-affinity nudge — **~0 token, no LLM.** *The library produces the depth; the router picks
+which lenses to load.*
+
+```bash
+node bin/ed-agent.mjs skills "launch a marketing campaign and improve SEO conversion" --mission marketing --limit 4
+# → blog-copy-humanizer · backend-data-geo-seo · seo-geo-self-audit · seo-strategy
+node bin/ed-agent.mjs skills "KYC onboarding and AML for a securities broker" --mission finance
+# → multi-jurisdiction-kyc-aml · us-securities-law-sec · compliance-approach …
+```
+
+Standalone surfaces: **`ed_agent_route_skills`** (MCP — args: `need`, optional `mission` / `limit`),
+the `skills` subcommand above, or `src/skillrouter.mjs` as a zero-dep library
+(`routeSkills(query, {mission, limit})` · `skillCatalog()`). The marketing mission already loads
+its top methods into every plan automatically.
+
+## Run it inside Claude — pick one *(no learning curve)*
+
+Full copy-paste guide: **[`INSTALL.md`](./INSTALL.md)**. The short version:
+
+| You have | Do this | Setup |
+| --- | --- | --- |
+| **Claude Desktop** | Download **[`ed-agent.mcpb`](https://github.com/Edwson/Ed-Agent/releases/latest)** → Settings → Extensions → **drag it in** → Install | none — self-contained |
+| **Claude Desktop** *(config)* | Add `ed-agent` → `npx -y github:Edwson/Ed-Agent ed-agent-mcp` to your MCP config | needs Node 18+ |
+| **Claude Code** | `claude mcp add ed-agent -- npx -y github:Edwson/Ed-Agent ed-agent-mcp` | one line |
+
+Then just talk to Claude: *"list the ed-agent missions,"* *"use ed_agent_route_skills — which methods fit launching a product with SEO?,"* *"run ed_agent_deliberate on this diff."* Nothing runs automatically; the harness surfaces the decision, you make the call.
+
 ## Drop it into any bot
 
 **MCP (Claude · Cursor · Codex):**
@@ -280,14 +312,14 @@ and applies the preferred mission / jurisdiction automatically.
 { "mcpServers": { "ed-agent": { "command": "npx", "args": ["-y", "github:Edwson/Ed-Agent", "ed-agent-mcp"] } } }
 ```
 
-Tools (14): `ed_agent_run` · `ed_agent_loop` *(v0.6 — self-correct an artifact: severity gate ·
+Tools (15): `ed_agent_run` · `ed_agent_loop` *(v0.6 — self-correct an artifact: severity gate ·
 overshoot rollback · iron-law halt + the audit trail)* · `ed_agent_ironcheck` *(v0.6 — scan for
 crossed red lines)* · `ed_agent_learn` *(v0.6 — the flywheel: forge a learned rule from a
 rejection)* · `ed_agent_deliberate` (audit any artifact/diff — "should I trust this?") ·
 `ed_agent_redteam` (mission-aware adversarial scan) · `ed_agent_ground` (claim grounding, three
 states) · `ed_agent_trust_scan` (fast trust + substance) · `ed_agent_optimize` (the grand-mentor ·
 総監督 review) · `ed_agent_quality_scan` · `ed_agent_missions` · `ed_agent_skills` ·
-`ed_agent_remember` · `ed_agent_recall`. Enable with `npm install @modelcontextprotocol/sdk zod`
+`ed_agent_remember` · `ed_agent_recall` · `ed_agent_route_skills` *(route the .md skill library to a need)*. Enable with `npm install @modelcontextprotocol/sdk zod`
 (optional — the CLI and library are zero-dependency).
 
 **The host loop (deep deliberation):** `ed_agent_run` and `ed_agent_deliberate` return the open
@@ -342,4 +374,4 @@ npm run test:mcp  # live MCP-protocol test (needs the optional SDK)
 
 ## License
 
-MIT © Ed Chen — [edwson.com](https://www.edwson.com) [Case Study](https://edwson.com/project-Ed_Agent.html)
+MIT © Ed Chen — [edwson.com](https://www.edwson.com)
